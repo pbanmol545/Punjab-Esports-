@@ -1,0 +1,2801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+  // Dynamic System UI (Status Bar & Navigation Bar) sync for Android WebViews & Mobile Browsers
+  (function() {
+    window.syncSystemBars = function(isDark) {
+      try {
+        var color = isDark ? '#000000' : '#ffffff';
+        var scheme = isDark ? 'dark' : 'light';
+
+        // 1. Root & document styling
+        if (document.documentElement) {
+          document.documentElement.setAttribute('data-bg', scheme);
+          document.documentElement.style.backgroundColor = color;
+          document.documentElement.style.colorScheme = scheme;
+        }
+        if (document.body) {
+          document.body.style.backgroundColor = color;
+          document.body.style.colorScheme = scheme;
+        }
+
+        // 2. Standard theme-color meta tag for Android Chrome, WebViews, and PWAs
+        var meta = document.getElementById('appThemeColor') || document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', 'theme-color');
+          meta.id = 'appThemeColor';
+          if (document.head) document.head.appendChild(meta);
+        }
+        if (meta) {
+          meta.setAttribute('content', color);
+          // Re-insert to trigger repaint in WebViews caching initial tag
+          try {
+            var parent = meta.parentNode;
+            if (parent) {
+              var next = meta.nextSibling;
+              parent.removeChild(meta);
+              parent.insertBefore(meta, next);
+            }
+          } catch(e) {}
+        }
+
+        // 3. color-scheme meta tag
+        var csMeta = document.getElementById('appColorScheme') || document.querySelector('meta[name="color-scheme"]');
+        if (csMeta) {
+          csMeta.setAttribute('content', scheme);
+        }
+
+        // 4. Apple mobile web app status bar style
+        var appleMeta = document.getElementById('appleStatusBar') || document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (appleMeta) {
+          appleMeta.setAttribute('content', isDark ? 'black-translucent' : 'default');
+        }
+
+        // 5. Windows / MS mobile navbutton
+        var msMeta = document.getElementById('msNavColor') || document.querySelector('meta[name="msapplication-navbutton-color"]');
+        if (msMeta) {
+          msMeta.setAttribute('content', color);
+        }
+
+        // 6. Direct Android WebView native bridge calls
+        if (window.Android) {
+          if (typeof window.Android.setSystemBars === 'function') {
+            window.Android.setSystemBars(color, isDark);
+          } else if (typeof window.Android.updateSystemBars === 'function') {
+            window.Android.updateSystemBars(color, isDark);
+          } else if (typeof window.Android.setStatusBarColor === 'function') {
+            window.Android.setStatusBarColor(color, isDark);
+            if (typeof window.Android.setNavigationBarColor === 'function') {
+              window.Android.setNavigationBarColor(color, isDark);
+            }
+          } else if (typeof window.Android.postMessage === 'function') {
+            window.Android.postMessage(JSON.stringify({ type: 'THEME_COLOR_CHANGE', color: color, isDark: isDark }));
+          }
+        }
+        if (window.AndroidInterface && typeof window.AndroidInterface.setSystemBars === 'function') {
+          window.AndroidInterface.setSystemBars(color, isDark);
+        }
+        if (window.AndroidBridge && typeof window.AndroidBridge.setSystemBars === 'function') {
+          window.AndroidBridge.setSystemBars(color, isDark);
+        }
+      } catch (err) {}
+    };
+
+    // Apply theme and system bars instantly from localStorage to prevent splash screen flash
+    try {
+      var t = localStorage.getItem('pe_theme') || 'amoled';
+      var b = localStorage.getItem('pe_bg') || 'dark';
+      var isDark = b === 'dark';
+      var splashColors = {
+        amoled: ['#8b5cf6', '#a78bfa'], cyber: ['#00a3ff', '#4dc4ff'],
+        fire: ['#ff4d2e', '#ff8566'], neon: ['#c026d3', '#e879f9'],
+        emerald: ['#10b981', '#34d399'], gold: ['#d4af37', '#f0cf6b'],
+        ocean: ['#06b6d4', '#67e8f9'], light: ['#6d28d9', '#7c3aed']
+      };
+      var colors = splashColors[t] || splashColors.amoled;
+      document.documentElement.style.setProperty('--splash-ac', colors[0]);
+      document.documentElement.style.setProperty('--splash-ac2', colors[1]);
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.setAttribute('data-bg', b);
+      window.syncSystemBars(isDark);
+    } catch(e) {
+      document.documentElement.setAttribute('data-theme', 'amoled');
+      document.documentElement.setAttribute('data-bg', 'dark');
+      window.syncSystemBars(true);
+    }
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000" id="appThemeColor">
+<meta name="color-scheme" content="dark light" id="appColorScheme">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" id="appleStatusBar">
+<meta name="msapplication-navbutton-color" content="#000000" id="msNavColor">
+<title>Punjab Esports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<style>
+:root{--f:'Poppins',system-ui,sans-serif;--rs:8px;--rm:14px;--rl:20px;--rp:999px;--t:.22s cubic-bezier(.4,0,.2,1);--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);--nav-h:64px;--sh1:0 1px 3px rgba(0,0,0,.35);--sh2:0 6px 20px rgba(0,0,0,.45);--sh3:0 18px 50px rgba(0,0,0,.55)}
+
+/* BASE THEMES */
+[data-theme="amoled"]{--sf:#fff;--sf2:#f0f1f6;--sf3:#e6e8f0;--bd:#dfe1ea;--bd2:#c4c8d8;--tx:#16161d;--txd:#565a6e;--txm:#8a8fa3;--ac:#8b5cf6;--ac2:#a78bfa;--acs:rgba(139,92,246,.1);--acg:rgba(139,92,246,.22);--onac:#fff;--ok:#16a34a;--oks:rgba(22,163,74,.12);--wn:#d97706;--wns:rgba(217,119,6,.12);--er:#dc2626;--ers:rgba(220,38,38,.12);--inf:#2563eb;--infs:rgba(37,99,235,.12);--ov:rgba(20,20,30,.45);--nav:rgba(255,255,255,.92);--sh1:0 1px 3px rgba(20,20,40,.08);--sh2:0 6px 20px rgba(20,20,40,.12);--sh3:0 18px 50px rgba(20,20,40,.18)}
+[data-theme="cyber"]{--sf:#fff;--sf2:#f0f6fc;--sf3:#e0eefa;--bd:#cce0f5;--bd2:#a3c8e8;--tx:#0a1c2e;--txd:#406285;--txm:#6f91b3;--ac:#00a3ff;--ac2:#4dc4ff;--acs:rgba(0,163,255,.1);--acg:rgba(0,163,255,.22);--onac:#00121f;--ok:#10b981;--oks:rgba(16,185,129,.12);--wn:#f59e0b;--wns:rgba(245,158,11,.12);--er:#f43f5e;--ers:rgba(244,63,94,.12);--inf:#38bdf8;--infs:rgba(56,189,248,.12);--ov:rgba(10,20,40,.45);--nav:rgba(255,255,255,.92)}
+[data-theme="fire"]{--sf:#fff;--sf2:#fff5f2;--sf3:#ffe6df;--bd:#ffd1c4;--bd2:#ffa68c;--tx:#3a0d04;--txd:#8c3d2c;--txm:#bf6a55;--ac:#ff4d2e;--ac2:#ff8566;--acs:rgba(255,77,46,.1);--acg:rgba(255,77,46,.22);--onac:#fff;--ok:#22c55e;--oks:rgba(34,197,94,.12);--wn:#fbbf24;--wns:rgba(251,191,36,.12);--er:#ff2d55;--ers:rgba(255,45,85,.12);--inf:#f97316;--infs:rgba(249,115,22,.12);--ov:rgba(40,10,5,.45);--nav:rgba(255,255,255,.92)}
+[data-theme="neon"]{--sf:#fff;--sf2:#f9f5ff;--sf3:#f0e6ff;--bd:#e3d1ff;--bd2:#c9a6ff;--tx:#200a3a;--txd:#684491;--txm:#9571c4;--ac:#c026d3;--ac2:#e879f9;--acs:rgba(192,38,211,.1);--acg:rgba(192,38,211,.22);--onac:#fff;--ok:#22c55e;--oks:rgba(34,197,94,.12);--wn:#f59e0b;--wns:rgba(245,158,11,.12);--er:#f43f5e;--ers:rgba(244,63,94,.12);--inf:#a855f7;--infs:rgba(168,85,247,.12);--ov:rgba(30,10,50,.45);--nav:rgba(255,255,255,.92)}
+[data-theme="emerald"]{--sf:#fff;--sf2:#f0fdf4;--sf3:#dcfce7;--bd:#bbf7d0;--bd2:#86efac;--tx:#022c22;--txd:#166534;--txm:#4ade80;--ac:#10b981;--ac2:#34d399;--acs:rgba(16,185,129,.1);--acg:rgba(16,185,129,.22);--onac:#00251a;--ok:#22c55e;--oks:rgba(34,197,94,.12);--wn:#fbbf24;--wns:rgba(251,191,36,.12);--er:#f43f5e;--ers:rgba(244,63,94,.12);--inf:#2dd4bf;--infs:rgba(45,212,191,.12);--ov:rgba(5,30,20,.45);--nav:rgba(255,255,255,.92)}
+[data-theme="gold"]{--sf:#fff;--sf2:#fffdf5;--sf3:#fffbeb;--bd:#fef3c7;--bd2:#fde68a;--tx:#422006;--txd:#78350f;--txm:#b45309;--ac:#d4af37;--ac2:#f0cf6b;--acs:rgba(212,175,55,.1);--acg:rgba(212,175,55,.22);--onac:#1a1305;--ok:#22c55e;--oks:rgba(34,197,94,.12);--wn:#f59e0b;--wns:rgba(245,158,11,.12);--er:#ef4444;--ers:rgba(239,68,68,.12);--inf:#eab308;--infs:rgba(234,179,8,.12);--ov:rgba(40,30,5,.45);--nav:rgba(255,255,255,.92)}
+[data-theme="ocean"]{--sf:rgba(255,255,255,.7);--sf2:rgba(240,249,255,.8);--sf3:rgba(224,242,254,.9);--bd:rgba(186,230,253,.6);--bd2:rgba(125,211,252,.7);--tx:#082f49;--txd:#0c4a6e;--txm:#0369a1;--ac:#06b6d4;--ac2:#67e8f9;--acs:rgba(6,182,212,.1);--acg:rgba(6,182,212,.22);--onac:#002733;--ok:#2dd4bf;--oks:rgba(45,212,191,.12);--wn:#fbbf24;--wns:rgba(251,191,36,.12);--er:#fb7185;--ers:rgba(251,113,133,.12);--inf:#22d3ee;--infs:rgba(34,211,238,.12);--ov:rgba(2,30,45,.45);--nav:rgba(255,255,255,.8)}
+[data-theme="light"]{--sf:#fff;--sf2:#f0f1f6;--sf3:#e6e8f0;--bd:#dfe1ea;--bd2:#c4c8d8;--tx:#16161d;--txd:#565a6e;--txm:#8a8fa3;--ac:#6d28d9;--ac2:#7c3aed;--acs:rgba(109,40,217,.1);--acg:rgba(109,40,217,.22);--onac:#fff;--ok:#16a34a;--oks:rgba(22,163,74,.12);--wn:#d97706;--wns:rgba(217,119,6,.12);--er:#dc2626;--ers:rgba(220,38,38,.12);--inf:#2563eb;--infs:rgba(37,99,235,.12);--ov:rgba(20,20,30,.45);--nav:rgba(255,255,255,.92)}
+
+/* DARK MODE OVERRIDES */
+[data-bg="dark"] {
+  --bg:#000000; --bg2:#0c0c10;
+  --sf:#121218; --sf2:#1a1a24; --sf3:#222230;
+  --bd:#2a2a3a; --bd2:#3a3a4e;
+  --tx:#f2f2f7; --txd:#a0a0b2; --txm:#6a6a80;
+  --ov:rgba(0,0,0,.78);
+  --nav:rgba(8,8,12,.96);
+  --sh1:0 1px 3px rgba(0,0,0,.35); --sh2:0 6px 20px rgba(0,0,0,.45); --sh3:0 18px 50px rgba(0,0,0,.55);
+}
+[data-bg="light"] {
+  --bg:#ffffff; --bg2:#f7f8fc;
+  --sf:#ffffff; --sf2:#f0f2f7; --sf3:#e5e8f2;
+  --bd:#dfe2ec; --bd2:#c4c8d8;
+  --tx:#16161d; --txd:#565a6e; --txm:#8a8fa3;
+  --ov:rgba(20,20,30,.45);
+  --nav:rgba(255,255,255,.96);
+  --sh1:0 1px 3px rgba(20,20,40,.08); --sh2:0 6px 20px rgba(20,20,40,.12); --sh3:0 18px 50px rgba(20,20,40,.18);
+}
+
+html {
+  color-scheme: dark light;
+}
+html[data-bg="dark"] {
+  color-scheme: dark;
+}
+html[data-bg="light"] {
+  color-scheme: light;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{overflow-x:hidden;transition:background var(--t),color var(--t);padding-bottom:calc(var(--nav-h) + var(--safe-b))}
+h1,h2,h3,h4{margin:0 0 10px;font-weight:600;line-height:1.25}
+h1{font-size:1.5rem}h2{font-size:1.25rem}h3{font-size:1.05rem}
+p{margin:0 0 10px;color:var(--txd)}
+a{color:var(--ac2);text-decoration:none}
+img{max-width:100%;display:block}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none!important}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:var(--rp)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* Splash screen follows the saved app theme immediately, avoiding orange/other-color flashes */
+#splash{position:fixed;inset:0;background:var(--bg,#000);color:var(--tx);display:grid;place-items:center;z-index:2000;transition:opacity .4s ease}
+#splash.hide{opacity:0;pointer-events:none}
+#splash .sp-logo{width:88px;height:88px;border-radius:24px;background:var(--splash-ac,#8b5cf6);display:grid;place-items:center;color:#fff;font-size:2.5rem;box-shadow:0 12px 35px color-mix(in srgb,var(--splash-ac,#8b5cf6) 22%,transparent);animation:spPulse 1.6s ease infinite}
+@keyframes spPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#splash .sp-name{margin-top:20px;font-size:1.45rem;font-weight:700;letter-spacing:.3px;text-align:center;color:var(--splash-ac,#8b5cf6)}
+#splash .sp-loader{margin-top:24px;width:46px;height:46px;border-radius:50%;border:4.5px solid color-mix(in srgb,var(--splash-ac,#8b5cf6) 22%,transparent);border-top-color:var(--splash-ac,#8b5cf6);animation:spSpin .85s cubic-bezier(.65,.05,.36,1) infinite}
+@keyframes spSpin{to{transform:rotate(360deg)}}
+
+#authScreen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;padding-top:calc(20px + var(--safe-t));padding-bottom:calc(20px + var(--safe-b));background:radial-gradient(circle at 20% 10%,var(--acs),transparent 55%),radial-gradient(circle at 85% 90%,var(--acs),transparent 50%),var(--bg);z-index:1000;overflow-y:auto;display:none}
+.auth-card{width:100%;max-width:430px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);box-shadow:var(--sh3);padding:32px 24px;margin:auto}
+.brand-mark{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:24px}
+.brand-logo{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;color:var(--onac);font-size:1.7rem;box-shadow:0 0 32px var(--acg);flex-shrink:0}
+.auth-tabs{display:flex;gap:4px;background:var(--sf2);padding:4px;border-radius:var(--rm);margin-bottom:24px}
+.auth-tab{flex:1;padding:10px;border:none;background:none;color:var(--txd);font-weight:500;font-size:.85rem;border-radius:var(--rs);cursor:pointer;transition:all var(--t)}
+.auth-tab.active{background:var(--ac);color:var(--onac)}
+
+.field{margin-bottom:16px}
+.field>label{display:block;font-size:.82rem;font-weight:500;color:var(--txd);margin-bottom:8px}
+.field>label .req{color:var(--er)}
+.input,.select,.textarea{width:100%;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rm);padding:12px 14px;color:var(--tx);transition:border-color var(--t),box-shadow var(--t);min-height:46px}
+.input::placeholder,.textarea::placeholder{color:var(--txm)}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px var(--acs);background:var(--sf3)}
+.textarea{resize:vertical;min-height:80px;line-height:1.55}
+.select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:40px}
+.ig{position:relative}.ig .input{padding-left:42px}
+.ig .igi{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--txm);pointer-events:none}
+.ig .igt{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--txm);cursor:pointer;padding:8px;border-radius:var(--rs)}
+.field-error{display:block;color:var(--er);font-size:.76rem;margin-top:4px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:var(--rm);border:1px solid transparent;background:var(--sf2);color:var(--tx);font-weight:500;font-size:.9rem;cursor:pointer;transition:all var(--t);min-height:46px;white-space:nowrap;user-select:none}
+.btn:active:not(:disabled){transform:scale(.975)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--onac);box-shadow:0 4px 16px var(--acg)}
+.btn-outline{background:transparent;border-color:var(--bd2);color:var(--tx)}
+.btn-danger{background:var(--ers);color:var(--er)}
+.btn-success{background:var(--oks);color:var(--ok)}
+.btn-ghost{background:transparent;color:var(--txd)}
+.btn-block{width:100%}
+.btn-sm{padding:8px 14px;font-size:.8rem;min-height:38px}
+.btn .spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#appShell{display:none}
+#appShell.active{display:block}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;padding:14px 18px;padding-top:calc(14px + var(--safe-t));background:var(--nav);backdrop-filter:blur(14px);border-bottom:1px solid var(--bd)}
+.topbar .tb-brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.topbar .tb-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;color:var(--onac);font-size:1rem;flex-shrink:0}
+.topbar .tb-brand b{font-size:.95rem;display:-webkit-box;white-space:normal;line-height:1.2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.topbar .tb-brand small{font-size:.68rem;color:var(--txm);text-transform:uppercase;letter-spacing:1.2px}
+.icon-btn{width:42px;height:42px;display:grid;place-items:center;border-radius:var(--rm);border:1px solid var(--bd);background:var(--sf);color:var(--txd);cursor:pointer;transition:all var(--t);position:relative;flex-shrink:0}
+.icon-btn:hover{color:var(--ac);border-color:var(--ac)}
+.icon-btn .dot{position:absolute;top:6px;right:6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--er);color:#fff;font-size:.62rem;font-weight:700;display:grid;place-items:center;border:2px solid var(--sf);line-height:1}
+.icon-btn.bell-ring{animation:bellRing .8s ease}
+@keyframes bellRing{0%,100%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(8deg)}60%{transform:rotate(-6deg)}75%{transform:rotate(3deg)}}
+
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);background:var(--nav);backdrop-filter:blur(16px);border-top:1px solid var(--bd);padding-bottom:var(--safe-b);padding-top:4px}
+.bn-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 4px;background:none;border:none;color:var(--txm);cursor:pointer;font-size:.65rem;font-weight:500;transition:color var(--t);min-height:52px}
+.bn-item i{font-size:1.15rem}
+.bn-item.active{color:var(--ac2)}
+
+.page{display:none;padding:16px 18px;padding-bottom:24px;max-width:720px;margin:0 auto}
+.page.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.page-head{margin-bottom:18px}
+.page-head h1{font-size:1.35rem;margin-bottom:2px}
+.page-head p{margin:0;font-size:.82rem}
+
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);padding:18px;box-shadow:var(--sh1)}
+.card+.card{margin-top:14px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.card-head h3{margin:0;font-size:1rem}
+
+.balance-card{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--onac);border-radius:var(--rl);padding:22px;box-shadow:0 8px 26px var(--acg);position:relative;overflow:hidden;margin-bottom:16px}
+.balance-card::after{content:'';position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.1)}
+.balance-card .bc-label{font-size:.78rem;opacity:.9;text-transform:uppercase;letter-spacing:1px;position:relative;z-index:1}
+.balance-card .bc-amount{font-size:2.2rem;font-weight:700;margin:6px 0 4px;position:relative;z-index:1}
+.balance-card .bc-actions{display:flex;gap:10px;margin-top:14px;position:relative;z-index:1}
+.balance-card .bc-btn{flex:1;background:rgba(255,255,255,.2);border:none;color:var(--onac);padding:10px 14px;border-radius:var(--rm);font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background var(--t)}
+.balance-card .bc-btn:hover{background:rgba(255,255,255,.32)}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat-mini{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rm);padding:12px 10px;text-align:center}
+.stat-mini .sm-icon{font-size:1.2rem;color:var(--ac2);margin-bottom:6px}
+.stat-mini .sm-val{font-size:1.05rem;font-weight:700;line-height:1}
+.stat-mini .sm-label{font-size:.68rem;color:var(--txm);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+
+.match-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;margin-bottom:14px;transition:transform var(--t),border-color var(--t);cursor:pointer}
+.match-card:active{transform:scale(.99)}
+.match-banner{width:100%;height:150px;object-fit:cover;background:linear-gradient(135deg,var(--sf3),var(--sf2));display:grid;place-items:center;color:var(--txm);font-size:2rem;position:relative}
+.match-banner img{width:100%;height:100%;object-fit:cover}
+.match-body{padding:14px 16px}
+.match-title{font-size:1rem;font-weight:600;margin-bottom:6px;line-height:1.3}
+.match-meta{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.78rem;color:var(--txd);margin-bottom:10px}
+.match-meta span{display:inline-flex;align-items:center;gap:5px}
+.match-meta i{color:var(--txm);font-size:.85rem}
+.match-slot-row{margin-top:10px}
+
+.filter-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;-webkit-overflow-scrolling:touch}
+.filter-chip{padding:8px 14px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rp);color:var(--txd);font-size:.8rem;font-weight:500;white-space:nowrap;cursor:pointer;transition:all var(--t)}
+.filter-chip.active{background:var(--ac);color:var(--onac);border-color:var(--ac)}
+
+.premium-dropdown{position:relative;display:inline-block}
+.premium-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--sf);border:1px solid var(--bd2);border-radius:var(--rs);cursor:pointer;font-size:.75rem;font-weight:600;color:var(--tx);transition:all var(--t);box-shadow:var(--sh1)}
+.premium-btn:active{transform:scale(.95)}
+.premium-btn i{font-size:.7rem;color:var(--ac2)}
+.premium-menu{position:absolute;top:calc(100% + 8px);right:0;width:140px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rm);box-shadow:var(--sh2);overflow:hidden;display:none;z-index:100;animation:slideDown .2s ease}
+.premium-menu.show{display:block}
+@keyframes slideDown{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.premium-item{padding:10px 14px;cursor:pointer;font-size:.8rem;color:var(--txd);transition:background var(--t);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.premium-item:last-child{border-bottom:none}
+.premium-item:hover,.premium-item.active{background:var(--acs);color:var(--ac2);font-weight:600}
+.premium-item i{font-size:.7rem;opacity:0;color:var(--ac2)}
+.premium-item.active i{opacity:1}
+
+.search-box{position:relative;margin-bottom:14px}
+.search-box .input{padding-left:40px}
+.search-box i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--txm)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--rp);font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;line-height:1.6}
+.badge i{font-size:.65rem}
+.badge.upcoming{background:var(--infs);color:var(--inf)}
+.badge.ongoing{background:var(--oks);color:var(--ok)}
+.badge.completed{background:var(--sf3);color:var(--txd)}
+.badge.cancelled{background:var(--ers);color:var(--er)}
+.badge.pending{background:var(--wns);color:var(--wn)}
+.badge.approved,.badge.paid{background:var(--oks);color:var(--ok)}
+.badge.rejected{background:var(--ers);color:var(--er)}
+.badge.br{background:rgba(255,77,46,.18);color:#ff8566}
+.badge.cs{background:rgba(0,163,255,.18);color:#4dc4ff}
+.badge.lw{background:rgba(212,175,55,.18);color:#f0cf6b}
+.badge.neutral{background:var(--sf3);color:var(--txd)}
+
+.slot-bar{height:6px;background:var(--sf3);border-radius:var(--rp);overflow:hidden;margin:6px 0}
+.slot-fill{height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));border-radius:var(--rp);transition:width .5s ease}
+.slot-fill.full{background:linear-gradient(90deg,var(--er),#ff8566)}
+.slot-meta{display:flex;justify-content:space-between;font-size:.72rem;color:var(--txm)}
+
+.mb{position:fixed;inset:0;background:var(--ov);backdrop-filter:blur(4px);z-index:200;display:grid;place-items:center;padding:16px;padding-top:calc(16px + var(--safe-t));padding-bottom:calc(16px + var(--safe-b));overflow-y:auto}
+.modal{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);box-shadow:var(--sh3);width:100%;max-width:500px;max-height:92vh;display:flex;flex-direction:column;margin:auto}
+.mh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px;border-bottom:1px solid var(--bd)}
+.mh h3{margin:0;font-size:1.05rem}
+.mbody{padding:18px;overflow-y:auto;flex:1}
+.mfoot{display:flex;gap:10px;justify-content:flex-end;padding:18px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.close-x{background:none;border:none;color:var(--txm);font-size:1.15rem;cursor:pointer;width:36px;height:36px;border-radius:var(--rs);display:grid;place-items:center}
+.close-x:hover{background:var(--sf2);color:var(--er)}
+@media(max-width:480px){.mfoot{flex-direction:column-reverse}.mfoot .btn{width:100%}}
+
+#toastHost{position:fixed;top:calc(16px + var(--safe-t));right:16px;left:16px;z-index:300;display:flex;flex-direction:column;gap:8px;max-width:calc(100vw - 32px);margin-left:auto;pointer-events:none}
+@media(min-width:600px){#toastHost{left:auto;max-width:360px}}
+.toast{display:flex;align-items:flex-start;gap:12px;background:var(--sf);border:1px solid var(--bd);border-left:4px solid var(--ac);border-radius:var(--rm);padding:12px 16px;box-shadow:var(--sh2);pointer-events:auto;animation:ti .28s}
+@keyframes ti{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:none}}
+.toast .t-icon{font-size:1.05rem;margin-top:1px}
+.toast .t-body{flex:1;min-width:0}
+.toast .t-title{font-weight:600;font-size:.85rem}
+.toast .t-msg{font-size:.78rem;color:var(--txd);word-break:break-word}
+.toast .t-close{background:none;border:none;color:var(--txm);cursor:pointer;padding:2px;font-size:.85rem}
+.toast.success{border-left-color:var(--ok)}.toast.success .t-icon{color:var(--ok)}
+.toast.error{border-left-color:var(--er)}.toast.error .t-icon{color:var(--er)}
+.toast.warning{border-left-color:var(--wn)}.toast.warning .t-icon{color:var(--wn)}
+.toast.info{border-left-color:var(--inf)}.toast.info .t-icon{color:var(--inf)}
+
+.muted{color:var(--txm)}
+.tc{text-align:center}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}
+.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}
+.flex{display:flex}.flex-between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gap-2{gap:8px}.gap-3{gap:12px}
+.w-100{width:100%}
+.code-inline{font-family:ui-monospace,Menlo,monospace;font-size:.78rem;background:var(--sf3);padding:2px 7px;border-radius:6px;color:var(--ac2)}
+.amount{font-variant-numeric:tabular-nums;font-weight:600}
+.amount.pos{color:var(--ok)}.amount.neg{color:var(--er)}
+.divider{height:1px;background:var(--bd);margin:14px 0;border:none}
+.empty-state{text-align:center;padding:44px 20px;color:var(--txm)}
+.empty-state .es-icon{font-size:2.6rem;margin-bottom:14px;opacity:.5}
+.empty-state h3{color:var(--txd);font-size:1rem;margin-bottom:6px}
+.empty-state p{font-size:.82rem;max-width:320px;margin:0 auto}
+.loading-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;color:var(--txm);font-size:.85rem}
+.spinner{width:22px;height:22px;border:2.5px solid var(--bd2);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
+.alert{display:flex;gap:12px;padding:14px;border-radius:var(--rm);border:1px solid transparent;font-size:.84rem;margin-bottom:14px}
+.alert i{margin-top:2px}
+.alert.error{background:var(--ers);border-color:rgba(239,68,68,.3);color:var(--er)}
+.alert.success{background:var(--oks);border-color:rgba(34,197,94,.3);color:var(--ok)}
+.alert.warning{background:var(--wns);border-color:rgba(245,158,11,.3);color:var(--wn)}
+.alert.info{background:var(--infs);border-color:rgba(59,130,246,.3);color:var(--inf)}
+
+.list-item{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--bd);transition:background var(--t);position:relative}
+.list-item:last-child{border-bottom:none}
+.li-icon{width:42px;height:42px;border-radius:var(--rm);display:grid;place-items:center;flex-shrink:0;font-size:1rem}
+.li-body{flex:1;min-width:0}
+.li-body b{display:block;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-body small{color:var(--txm);font-size:.74rem;display:block;margin-top:1px}
+.delete-tx-btn{background:none;border:none;color:var(--er);cursor:pointer;font-size:1rem;padding:8px;transition:color 0.2s;display:flex;align-items:center;justify-content:center;}
+.delete-tx-btn:hover{opacity:0.7;}
+
+.avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;color:var(--onac);font-weight:600;font-size:1.4rem;flex-shrink:0;overflow:hidden;position:relative}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.avatar emoji-picker{font-size:2rem;line-height:1;}
+
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.theme-swatch{border:2px solid var(--bd);border-radius:var(--rm);padding:12px;cursor:pointer;text-align:center;transition:all var(--t);position:relative}
+.theme-swatch.active{border-color:var(--ac);box-shadow:0 0 0 3px var(--acs)}
+.ts-dots{display:flex;gap:5px;justify-content:center;margin-bottom:8px}
+.ts-dots span{width:18px;height:18px;border-radius:50%}
+.theme-swatch small{font-size:.72rem;color:var(--txd);display:block;margin-bottom:6px}
+.ts-ctrl{display:flex;gap:4px;justify-content:center}
+.ts-mini{font-size:.62rem;padding:3px 7px;border-radius:5px;border:1px solid var(--bd);background:var(--sf2);color:var(--txm)}
+.ts-mini.on{background:var(--oks);color:var(--ok);border-color:transparent}
+
+.room-box{background:var(--sf2);border:1px dashed var(--bd2);border-radius:var(--rm);padding:14px;margin-top:12px}
+.room-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.room-row:last-child{border-bottom:none}
+.room-row .rk{color:var(--txm);font-size:.8rem}
+.room-row .rv{font-weight:600;font-size:.95rem;font-family:ui-monospace,Menlo,monospace;color:var(--ac2);letter-spacing:1px}
+.copy-btn{background:var(--acs);color:var(--ac2);border:none;padding:6px 10px;border-radius:var(--rs);cursor:pointer;font-size:.72rem;font-weight:600}
+
+.notif-modal .modal{max-width:520px}
+.notif-header-count{background:var(--er);color:#fff;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:var(--rp);margin-left:8px}
+.notif-list{display:flex;flex-direction:column;gap:10px}
+.notif-item{display:flex;gap:12px;padding:14px;border-radius:var(--rm);background:var(--sf2);border:1px solid var(--bd);transition:all var(--t);position:relative;cursor:pointer}
+.notif-item.unread{background:linear-gradient(135deg,var(--acs),transparent 80%);border-color:var(--acs)}
+.notif-item.unread::before{content:'';position:absolute;top:14px;right:14px;width:8px;height:8px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}
+.notif-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;font-size:1.15rem}
+.notif-icon.registration{background:var(--oks);color:var(--ok)}
+.notif-icon.balance{background:var(--acs);color:var(--ac2)}
+.notif-icon.deposit{background:var(--oks);color:var(--ok)}
+.notif-icon.withdraw{background:var(--infs);color:var(--inf)}
+.notif-icon.reward{background:var(--wns);color:var(--wn)}
+.notif-icon.reject{background:var(--ers);color:var(--er)}
+.notif-icon.info{background:var(--sf3);color:var(--txd)}
+.notif-content{flex:1;min-width:0;padding-right:14px}
+.notif-title{font-weight:600;font-size:.9rem;color:var(--tx);margin-bottom:3px}
+.notif-body{font-size:.78rem;color:var(--txd);line-height:1.5;word-break:break-word;margin-bottom:6px}
+.notif-time{font-size:.68rem;color:var(--txm);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:5px}
+.notif-empty{text-align:center;padding:60px 20px;color:var(--txm)}
+.notif-empty i{font-size:3rem;margin-bottom:14px;opacity:.4;color:var(--ac2)}
+.notif-empty h4{color:var(--txd);font-size:.95rem;margin-bottom:6px}
+
+.share-preview{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rm);padding:12px;font-size:.8rem;color:var(--txd);white-space:pre-wrap;line-height:1.5;margin-bottom:12px;max-height:100px;overflow-y:auto;font-family:ui-monospace,Menlo,monospace;word-break:break-all}
+.share-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;width:100%;box-sizing:border-box}
+.share-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 10px;border-radius:var(--rm);text-decoration:none;color:#fff;font-size:.85rem;font-weight:600;text-align:center;transition:transform var(--t);cursor:pointer;width:100%;box-sizing:border-box}
+.share-btn:active{transform:scale(.95)}
+.share-btn i{font-size:1.6rem}
+.share-btn.whatsapp{background:linear-gradient(135deg,#25d366,#128c7e)}
+.share-btn.telegram{background:linear-gradient(135deg,#0088cc,#229ed9)}
+.share-btn.instagram{background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)}
+.share-btn.sms{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+
+.channel-btn{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:18px;text-decoration:none;color:#fff;font-weight:600;transition:all var(--t);margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.channel-btn:active{transform:scale(.98)}
+.channel-btn:last-child{margin-bottom:0}
+.channel-btn.whatsapp{background:linear-gradient(90deg,#128c7e,#25d366)}
+.channel-btn.telegram{background:linear-gradient(90deg,#0088cc,#229ed9)}
+.channel-btn.instagram{background:linear-gradient(90deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)}
+.channel-btn.email{background:linear-gradient(90deg,#c5221f,#ea4335)}
+.channel-btn-icon{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;flex-shrink:0;font-size:1.4rem}
+.channel-btn .cb-text{flex:1;min-width:0}
+.channel-btn .cb-text b{display:block;font-size:1.02rem;letter-spacing:.2px}
+.channel-btn .cb-text small{font-size:.76rem;opacity:.92;display:block;font-weight:400;margin-top:2px}
+
+#profileName{font-size:1.35rem;word-break:break-word;line-height:1.3;margin-bottom:4px}
+.reward-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--rp);background:var(--oks);color:var(--ok);font-size:.72rem;font-weight:700}
+.reward-badge i{font-size:.7rem}
+.match-reward-detail{display:flex;gap:10px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd);font-size:.78rem;color:var(--txd)}
+.match-reward-detail b{color:var(--ok);font-weight:700}
+
+/* SPIN WHEEL */
+.spin-wrap{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);padding:18px;text-align:center;margin-bottom:16px;position:relative;overflow:hidden}
+.spin-wrap::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at top,var(--acs),transparent 60%);pointer-events:none}
+.spin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;position:relative;z-index:1}
+.spin-header h3{margin:0;font-size:1rem;display:flex;align-items:center;gap:8px}
+.spin-header h3 i{color:var(--ac2)}
+.spin-limits{font-size:.72rem;color:var(--txm);background:var(--sf3);padding:4px 10px;border-radius:var(--rp);font-weight:600}
+.wheel-container{position:relative;width:260px;height:260px;margin:0 auto 18px;display:grid;place-items:center}
+.wheel-pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:26px solid var(--er);z-index:10;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+.wheel-pointer::after{content:'';position:absolute;top:-30px;left:-6px;width:12px;height:12px;background:var(--er);border-radius:50%}
+#wheelCanvas{border-radius:50%;box-shadow:0 0 0 8px var(--sf2),0 0 0 10px var(--bd),0 8px 30px rgba(0,0,0,.4);transition:transform 5s cubic-bezier(.17,.67,.2,1)}
+
+/* EARN CARDS */
+.earn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.earn-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rm);padding:14px 8px;text-align:center;cursor:pointer;transition:all var(--t);position:relative;overflow:hidden}
+.earn-card:active{transform:scale(.96)}
+.earn-card .ec-icon{font-size:1.8rem;margin-bottom:8px}
+.earn-card.ad-option .ec-icon{color:var(--inf)}
+.earn-card.spin-option .ec-icon{color:var(--wn)}
+.earn-card.daily-option .ec-icon{color:var(--ok)}
+.earn-card b{display:block;font-size:.8rem;margin-bottom:4px;line-height:1.2}
+.earn-card small{font-size:.65rem;color:var(--txm);display:block}
+
+.spin-btn{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--onac);border:none;padding:14px 36px;border-radius:var(--rp);font-weight:700;font-size:1rem;cursor:pointer;box-shadow:0 6px 20px var(--acg);transition:all var(--t);display:inline-flex;align-items:center;gap:10px;min-height:52px;width:100%;justify-content:center}
+.spin-btn:active:not(:disabled){transform:scale(.96)}
+.spin-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.spin-btn .spin-coin{animation:coinSpin 2s linear infinite}
+@keyframes coinSpin{to{transform:rotateY(360deg)}}
+.spin-status{margin-top:10px;font-size:.76rem;color:var(--txm);text-align:center}
+.spin-status .highlight{color:var(--ok);font-weight:700}
+
+.reward-popup{text-align:center;padding:10px 0}
+.reward-popup .rp-icon{font-size:4rem;margin-bottom:14px;animation:popIn .5s ease}
+.reward-popup .rp-amount{font-size:2.4rem;font-weight:800;color:#67e8f9;margin-bottom:6px;font-variant-numeric:tabular-nums;display:flex;justify-content:center;align-items:center;gap:10px;}
+.reward-popup .rp-sub{color:var(--txd);font-size:.85rem}
+@keyframes popIn{0%{transform:scale(0) rotate(-180deg);opacity:0}60%{transform:scale(1.2) rotate(10deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
+
+.ad-overlay{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:5000;display:grid;place-items:center;padding:20px;color:#fff;text-align:center}
+.ad-overlay .ad-box{max-width:400px;width:100%}
+.ad-overlay .ad-loader{width:60px;height:60px;border:4px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+.ad-overlay h3{color:#fff;font-size:1.2rem;margin-bottom:8px}
+.ad-overlay p{color:rgba(255,255,255,.7);font-size:.85rem;margin-bottom:20px}
+.ad-overlay .ad-skip{background:rgba(255,255,255,.15);color:#fff;border:none;padding:12px 24px;border-radius:var(--rp);cursor:pointer;font-weight:600;font-size:.9rem}
+.ad-overlay .ad-skip:disabled{opacity:.4;cursor:not-allowed}
+.ad-countdown{font-size:2rem;font-weight:700;color:var(--wn);margin:12px 0}
+
+/* CHAT & VIP */
+.blue-tick{color:#00a3ff;font-size:0.85rem;margin-left:4px}
+#chatMessages{height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px 4px 4px 0;scroll-behavior:smooth;}
+.chat-msg{display:flex;flex-direction:column;padding:10px 14px;border-radius:16px;background:var(--sf2);position:relative;max-width:85%;border:1px solid var(--bd);box-shadow:var(--sh1);user-select:none;-webkit-user-select:none;}
+.chat-msg.mine{align-self:flex-end;background:var(--acs);border-color:var(--ac);border-bottom-right-radius:4px;}
+.chat-msg:not(.mine){border-bottom-left-radius:4px;}
+.chat-msg-header{display:flex;align-items:center;gap:6px;font-size:0.75rem;color:var(--txd);margin-bottom:4px;font-weight:700}
+.chat-msg-text{font-size:0.9rem;color:var(--tx);word-break:break-word;line-height:1.4;}
+.chat-msg-time{font-size:0.65rem;color:var(--txm);margin-top:4px;align-self:flex-end;}
+
+.chat-input-area{display:flex;gap:8px;margin-top:12px;align-items:center;position:relative;}
+.chat-input-area .input{flex:1;min-width:0;border-radius:var(--rp);padding:12px 18px;background:var(--sf2);}
+.chat-input-area .btn{width:48px;height:48px;border-radius:50%;padding:0;flex-shrink:0;display:grid;place-items:center;font-size:1.1rem;}
+.emoji-btn-chat { width:40px; height:40px; border-radius:50%; background:var(--sf2); border:1px solid var(--bd); color:var(--txm); display:grid; place-items:center; cursor:pointer; font-size:1.2rem; flex-shrink:0; transition:all 0.2s;}
+.emoji-btn-chat:hover { color:var(--ac); border-color:var(--ac); }
+.emoji-picker-popup { position:absolute; bottom:100%; left:0; right:0; margin-bottom:8px; background:var(--sf); border:1px solid var(--bd); border-radius:var(--rm); box-shadow:var(--sh2); padding:10px; display:none; z-index:10; max-height:200px; overflow-y:auto; grid-template-columns:repeat(auto-fill, minmax(40px, 1fr)); gap:5px; }
+.emoji-picker-popup.show { display:grid; }
+
+/* VIP PLANS */
+.vip-plan-card{border:2px solid var(--bd);border-radius:var(--rm);padding:14px;margin-bottom:12px;cursor:pointer;transition:all var(--t);position:relative;overflow:hidden}
+.vip-plan-card:active{transform:scale(0.98)}
+.vip-plan-card.selected{border-color:var(--ac);background:var(--acs)}
+.vip-plan-card .vpc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.vip-plan-card .vpc-head b{color:var(--ac2);font-size:1.05rem}
+.vip-plan-card .vpc-prices{display:flex;gap:16px;flex-wrap:wrap;font-size:0.85rem}
+.vip-plan-card .vpc-price{display:flex;align-items:center;gap:5px}
+.vip-plan-card .vpc-price i{font-size:0.75rem;opacity:0.8}
+.vip-feature-list{list-style:none;padding:0;margin:0 0 16px 0}
+.vip-feature-list li{display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--txd);margin-bottom:8px}
+.vip-feature-list li i{color:var(--ok)}
+.vip-badge-premium{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;font-size:0.65rem;font-weight:800;padding:2px 8px;border-radius:var(--rp);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px}
+.diamond-display{display:flex;align-items:center;gap:6px;font-weight:700;color:#67e8f9}
+.diamond-display i{font-size:1rem}
+
+.admin-note{background:var(--wns);border:1px dashed var(--wn);border-radius:var(--rm);padding:10px 14px;font-size:0.75rem;color:var(--wn);margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
+.admin-note i{margin-top:2px}
+
+/* Emoji Picker */
+.emoji-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(45px, 1fr));gap:10px;max-height:300px;overflow-y:auto;padding:10px;background:var(--sf2);border-radius:var(--rm);}
+.emoji-btn{font-size:2rem;background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:5px;cursor:pointer;transition:all 0.2s;text-align:center;display:flex;align-items:center;justify-content:center;aspect-ratio:1;}
+.emoji-btn:hover{background:var(--acs);border-color:var(--ac);transform:scale(1.1);}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="sp-logo"><i class="fa-solid fa-gamepad"></i></div>
+    <div class="sp-name">Punjab Esports</div>
+    <div class="sp-loader"></div>
+  </div>
+</div>
+
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="brand-mark">
+      <div class="brand-logo"><i class="fa-solid fa-gamepad"></i></div>
+    </div>
+    <div class="tc mb-4">
+      <h1 style="margin-bottom:4px">Punjab Esports</h1>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Sign In</button>
+      <button class="auth-tab" data-tab="register">Register</button>
+    </div>
+    <div id="authAlert"></div>
+
+    <form id="loginForm" novalidate>
+      <div class="field"><label>Email <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-envelope igi"></i><input type="email" id="loginEmail" class="input" placeholder="you@example.com" autocomplete="email" required></div><small class="field-error" id="errLoginEmail"></small></div>
+      <div class="field"><label>Password <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-lock igi"></i><input type="password" id="loginPass" class="input" placeholder="Enter password" autocomplete="current-password" required><button type="button" class="igt" id="loginPassToggle"><i class="fa-solid fa-eye"></i></button></div><small class="field-error" id="errLoginPass"></small></div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginBtn"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
+      <p class="tc mt-3"><a href="#" id="forgotLink" style="font-size:.8rem">Forgot password?</a></p>
+    </form>
+
+    <form id="registerForm" novalidate hidden>
+      <div class="field"><label>Full Name <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-user igi"></i><input type="text" id="regName" class="input" placeholder="Your name" maxlength="40" required></div><small class="field-error" id="errRegName"></small></div>
+      <div class="field"><label>Email <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-envelope igi"></i><input type="email" id="regEmail" class="input" placeholder="you@example.com" autocomplete="email" required></div><small class="field-error" id="errRegEmail"></small></div>
+      <div class="field"><label>Free Fire UID <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-id-card igi"></i><input type="text" id="regFfUid" class="input" placeholder="Your FF UID (numbers)" maxlength="20" required></div><small class="field-error" id="errRegFfUid"></small></div>
+      <div class="field"><label>Password <span class="req">*</span></label><div class="ig"><i class="fa-solid fa-lock igi"></i><input type="password" id="regPass" class="input" placeholder="At least 6 characters" autocomplete="new-password" required><button type="button" class="igt" id="regPassToggle"><i class="fa-solid fa-eye"></i></button></div><small class="field-error" id="errRegPass"></small></div>
+      
+      <div class="field"><label>Referral Code (Optional)</label><div class="ig"><i class="fa-solid fa-gift igi"></i><input type="text" id="regRefCode" class="input" placeholder="Enter friend's code" style="text-transform:uppercase"></div><small class="field-hint">Get bonus if valid code entered!</small></div>
+
+      <label class="tc" style="display:flex;align-items:center;gap:8px;font-size:.8rem;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="regTerms" style="width:18px;height:18px;accent-color:var(--ac)"><span class="muted">I agree to the Terms & Fair Play policy</span></label>
+      <button type="submit" class="btn btn-primary btn-block" id="registerBtn"><i class="fa-solid fa-user-plus"></i> Create Account</button>
+    </form>
+  </div>
+</div>
+
+<div id="appShell">
+  <header class="topbar">
+    <div class="tb-brand">
+      <div class="tb-logo"><i class="fa-solid fa-gamepad"></i></div>
+      <div style="min-width:0;flex:1;padding-right:10px;">
+        <b id="userGreeting">Hey, Player <span id="topBlueTick"></span></b>
+        <small>Punjab Esports</small>
+      </div>
+    </div>
+    <button class="icon-btn" id="chatBtn" style="margin-right:4px;" title="World Chat"><i class="fa-solid fa-globe"></i></button>
+    <button class="icon-btn" id="notifBtn"><i class="fa-regular fa-bell"></i><span class="dot" id="notifDot" hidden>0</span></button>
+  </header>
+
+  <section class="page active" id="page-home">
+    <div class="balance-card">
+      <div class="bc-label">Available Balance</div>
+      <div class="bc-amount" id="homeBalance">₹0</div>
+      <div class="bc-actions">
+        <button class="bc-btn" id="homeAddBtn"><i class="fa-solid fa-plus"></i> Add Money</button>
+        <button class="bc-btn" id="homeWithdrawBtn"><i class="fa-solid fa-arrow-up"></i> Withdraw</button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-mini"><div class="sm-icon"><i class="fa-solid fa-trophy"></i></div><div class="sm-val" id="statPlayed">0</div><div class="sm-label">Matches</div></div>
+      <div class="stat-mini"><div class="sm-icon"><i class="fa-solid fa-medal"></i></div><div class="sm-val" id="statWins">0</div><div class="sm-label">Wins</div></div>
+      <div class="stat-mini"><div class="sm-icon"><i class="fa-solid fa-crosshairs"></i></div><div class="sm-val" id="statKills">0</div><div class="sm-label">Kills</div></div>
+    </div>
+
+    <div id="announcementHost"></div>
+    <div class="flex-between mb-3">
+      <h3 style="margin:0">Featured Matches</h3>
+      <button class="btn btn-ghost btn-sm" data-nav="tournaments">See all <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+    <div id="homeMatches"><div class="loading-center"><div class="spinner"></div>Loading…</div></div>
+  </section>
+
+  <section class="page" id="page-tournaments">
+    <div class="page-head flex-between" style="align-items:flex-start;margin-bottom:12px;">
+      <div>
+        <h1 style="margin-bottom:4px;">Tournaments</h1>
+        <p style="margin:0;">Join BR, CS, and Lone Wolf matches</p>
+      </div>
+      <div class="premium-dropdown">
+        <button class="premium-btn" id="typeDropdownBtn">
+          <i class="fa-solid fa-filter"></i> <span id="typeDropdownText">All</span> <i class="fa-solid fa-chevron-down" style="margin-left:2px;"></i>
+        </button>
+        <div class="premium-menu" id="typeDropdownMenu">
+          <div class="premium-item active" data-type="all">All Entries <i class="fa-solid fa-check"></i></div>
+          <div class="premium-item" data-type="free">Free Entry <i class="fa-solid fa-check"></i></div>
+          <div class="premium-item" data-type="paid">Paid Entry <i class="fa-solid fa-check"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="filter-tabs" id="statusTabs">
+      <button class="filter-chip active" data-status="upcoming">Upcoming</button>
+      <button class="filter-chip" data-status="ongoing">Ongoing</button>
+      <button class="filter-chip" data-status="completed">Completed</button>
+      <button class="filter-chip" data-status="all">All</button>
+    </div>
+    <div class="filter-tabs" id="modeTabs">
+      <button class="filter-chip active" data-mode="">All Modes</button>
+      <button class="filter-chip" data-mode="BR">Battle Royale</button>
+      <button class="filter-chip" data-mode="CS">Clash Squad</button>
+      <button class="filter-chip" data-mode="LW">Lone Wolf</button>
+    </div>
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="tourSearch" placeholder="Search matches…"></div>
+    <div id="tourList"><div class="loading-center"><div class="spinner"></div>Loading…</div></div>
+  </section>
+
+  <section class="page" id="page-mymatches">
+    <div class="page-head"><h1>My Matches</h1><p>Your tournament history</p></div>
+    <div id="myMatchesList"><div class="loading-center"><div class="spinner"></div>Loading…</div></div>
+  </section>
+
+  <section class="page" id="page-wallet">
+    <div class="page-head"><h1>Wallet</h1><p>Balance, transactions & history</p></div>
+    <div class="balance-card">
+      <div class="bc-label">Available Balance</div>
+      <div class="bc-amount" id="walletBalance">₹0</div>
+      <div class="bc-actions">
+        <button class="bc-btn" id="walletAddBtn"><i class="fa-solid fa-plus"></i> Add Money</button>
+        <button class="bc-btn" id="walletWithdrawBtn"><i class="fa-solid fa-arrow-up"></i> Withdraw</button>
+      </div>
+    </div>
+
+    <div class="card mb-3" style="background:linear-gradient(135deg,rgba(6,182,212,.15),rgba(139,92,246,.1));border-color:var(--bd2);">
+      <div class="flex-between" style="align-items: flex-start;">
+        <div>
+          <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--txm);margin-bottom:4px;">Your Diamonds</div>
+          <div class="diamond-display" style="font-size:1.8rem;"><i class="fa-solid fa-gem"></i> <span id="walletDiamonds">0</span></div>
+        </div>
+        
+        <div id="vipStatusContainer" style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+          <button class="btn btn-primary btn-sm" id="homeBuyVipBtn" style="background:linear-gradient(135deg,#06b6d4,#8b5cf6);">
+            <i class="fa-solid fa-crown"></i> Buy VIP
+          </button>
+          <div id="vipExpiryText" style="display: none; font-size: 0.75rem; color: #fbbf24; font-weight: 700; line-height: 1.2;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOCKED EARN SECTION -->
+    <div class="card mb-3" id="earnSection" style="position:relative; overflow:hidden; background:var(--sf2); border:1px dashed var(--bd2);">
+      <div class="card-head"><h3>💎 Get free diamonds to buy VIP</h3></div>
+      <div style="text-align:center; padding: 30px 10px;">
+        <i class="fa-solid fa-lock" style="font-size: 3.5rem; color: var(--wn); margin-bottom: 15px;"></i>
+        <h3 style="margin-bottom: 8px; color: var(--tx);">Coming Soon!</h3>
+        <p class="muted" style="font-size: 0.85rem; max-width: 250px; margin: 0 auto;">This feature will be available in the next update. Stay tuned!</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Transaction History</h3></div>
+      <div id="txList"><div class="loading-center"><div class="spinner"></div>Loading…</div></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-profile">
+    <div class="page-head"><h1>Profile</h1><p>Your account & settings</p></div>
+    <div class="card tc mb-3">
+      <div class="avatar" id="profileAvatar" style="margin:0 auto 12px">P</div>
+      <h2 id="profileName" style="margin-bottom:2px">Player <span id="profBlueTick"></span></h2>
+      <p class="muted" id="profileEmail" style="font-size:.82rem;margin:0"></p>
+      <div class="flex gap-2 mt-3" style="justify-content:center;flex-wrap:wrap">
+        <span class="badge neutral"><i class="fa-solid fa-id-card"></i> <span id="profileFfUid">—</span></span>
+        <span class="badge neutral"><i class="fa-solid fa-calendar"></i> <span id="profileJoined">—</span></span>
+      </div>
+      <button class="btn btn-outline btn-block mt-3" id="editProfileBtn"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+    </div>
+
+    <div class="card mb-3" id="profileVipCard" style="background:linear-gradient(135deg,#1e1b4b,#4c1d95); color:#fff; border:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0 0 4px; color:#fbbf24; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-crown"></i> VIP & Premium Store</h3>
+          <p style="margin:0; font-size:0.8rem; opacity:0.8;" id="vipCardSubText">Blue Tick, Themes, World Chat & Direct Admin DM</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="openVipStoreBtn" style="background:#fbbf24; color:#000; border:none; font-weight:700;">Store</button>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-head"><h3>Refer & Earn</h3></div>
+      <div class="room-box">
+        <div class="room-row"><span class="rk">Your Referral Code</span><span class="rv" id="refCode">—</span></div>
+        <button class="btn btn-primary btn-block mt-3" id="shareRefBtn"><i class="fa-solid fa-share-nodes"></i> Share & Earn</button>
+      </div>
+      <div class="stats-row mt-3">
+        <div class="stat-mini"><div class="sm-val" id="refCount">0</div><div class="sm-label">Referred</div></div>
+        <div class="stat-mini"><div class="sm-val" id="refEarned">₹0</div><div class="sm-label">Earned</div></div>
+        <div class="stat-mini"><div class="sm-val" id="refPending">0</div><div class="sm-label">Pending</div></div>
+      </div>
+    </div>
+    
+    <div class="card mb-3" id="channelsCard">
+      <div class="card-head"><h3>Connect With Us</h3></div>
+      <div id="channelsHost"></div>
+    </div>
+
+    <div class="card mb-3" id="themeCard">
+      <div class="card-head"><h3>Appearance</h3></div>
+      
+      <div class="flex-between" style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--bd);">
+        <div>
+          <div style="font-size:0.9rem; font-weight:600; color:var(--tx); display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-moon" style="color:var(--ac2);"></i> Dark Mode
+          </div>
+          <div style="font-size:0.7rem; color:var(--txm); margin-top:4px;">Toggle between black and white background</div>
+        </div>
+        <button class="btn btn-outline" id="darkModeToggle" style="width:50px; height:28px; padding:0; border-radius:50px; position:relative; border:1px solid var(--bd2); background:var(--sf2); cursor:pointer;">
+           <div id="darkModeKnob" style="position:absolute; width:22px; height:22px; border-radius:50%; background:var(--ac); top:2px; left:2px; transition:all 0.2s;"></div>
+        </button>
+      </div>
+
+      <div class="theme-grid" id="themeGrid"></div>
+    </div>
+
+    <div class="card mb-3">
+      <button class="btn btn-outline btn-block" id="rulesBtn"><i class="fa-solid fa-scroll"></i> Terms & Fair Play Policy</button>
+    </div>
+    <button class="btn btn-danger btn-block" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    <p class="tc muted mt-3" style="font-size:.72rem">Version 2.3.2 · Punjab Esports</p>
+  </section>
+
+  <nav class="bottom-nav">
+    <button class="bn-item active" data-nav="home"><i class="fa-solid fa-house"></i>Home</button>
+    <button class="bn-item" data-nav="tournaments"><i class="fa-solid fa-trophy"></i>Play</button>
+    <button class="bn-item" data-nav="mymatches"><i class="fa-solid fa-list-check"></i>My</button>
+    <button class="bn-item" data-nav="wallet"><i class="fa-solid fa-wallet"></i>Wallet</button>
+    <button class="bn-item" data-nav="profile"><i class="fa-solid fa-user"></i>Profile</button>
+  </nav>
+</div>
+
+<div id="toastHost"></div>
+<div id="modalHost"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, get, set, update, push, remove, onValue, off, query, orderByChild, equalTo, limitToLast, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBTLfhI3c2UBrA5re2UHHj_p1XamO5KWe4",
+  authDomain: "punjab-turnaments.firebaseapp.com",
+  databaseURL: "https://punjab-turnaments-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "punjab-turnaments",
+  storageBucket: "punjab-turnaments.firebasestorage.app",
+  messagingSenderId: "923158197845",
+  appId: "1:923158197845:web:674a90ea877471281286dc"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getDatabase(app);
+
+const State = {
+  user: null, profile: null, wallet: { balance: 0, reserved: 0 },
+  tournaments: [], myRegistrations: [], transactions: [], notifications: [], chatMessages: [],
+  matchResultsCache: {}, settings: {}, currentPage: 'home', vipSettings: {},
+  filters: { status: 'upcoming', mode: '', type: 'all', search: '' },
+  listeners: [], lastNotifTs: 0,
+  cleanupDays: 7, retentionMs: 7 * 24 * 60 * 60 * 1000,
+  shownStartupNotification: false,
+  localDeletedChats: JSON.parse(localStorage.getItem('deleted_chats') || '[]'),
+  localDeletedTxs: JSON.parse(localStorage.getItem('deleted_txs') || '[]'),
+  referrals: [],
+  dmListener: null
+};
+
+const DEFAULT_REFERRAL_MSG = `🎮 Join Punjab Esports & Win Real Cash!
+
+Use my code: *{code}*
+Get {signupBonus} signup bonus + I earn {referralBonus}!
+
+Download: {downloadLink}
+
+Play Free Fire tournaments, earn diamonds & withdraw to UPI! 💰`;
+
+function isVipActive() {
+  if (!State.profile || !State.profile.vipExpiry) return false;
+  return Date.now() < State.profile.vipExpiry;
+}
+
+const $  = (s, p=document) => p.querySelector(s);
+const $$ = (s, p=document) => Array.from(p.querySelectorAll(s));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isWithinRetention = (ts) => { if (State.cleanupDays === 0) return false; return !ts || (Date.now() - ts) <= State.retentionMs; };
+const fmtMoney = (rupees) => '₹' + (Number(rupees) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+const fmtDateTime = (ts) => { if (!ts) return '—'; const d = new Date(ts); if (isNaN(d.getTime())) return '—'; return d.toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12: true }); };
+const fmtTimeOnly = (ts) => { if (!ts) return ''; const d = new Date(ts); return d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12: true }); };
+const isValidUrl = (u) => { try { const x = new URL(u); return ['http:','https:'].includes(x.protocol); } catch { return false; } };
+
+function formatTime12h(timeStr) { if (!timeStr) return '—'; const parts = String(timeStr).split(':'); const hh = Number(parts[0]); const mm = Number(parts[1] || 0); if (isNaN(hh)) return timeStr; const period = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${String(mm).padStart(2,'0')} ${period}`; }
+function formatMatchDateTime(dateStr, timeStr) { if (!dateStr) return 'TBD'; try { const d = new Date(dateStr + 'T' + (timeStr || '00:00')); if (isNaN(d.getTime())) return `${dateStr} · ${formatTime12h(timeStr)}`; const datePart = d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }); const timePart = d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12: true }); return `${datePart} · ${timePart}`; } catch(e) { return `${dateStr} · ${formatTime12h(timeStr)}`; } }
+function fmtRelativeTime(ts) { if (!ts) return ''; const diff = Date.now() - ts; const s = Math.floor(diff / 1000); if (s < 60) return 'Just now'; const m = Math.floor(s / 60); if (m < 60) return `${m} min ago`; const h = Math.floor(m / 60); if (h < 24) return `${h} hr ago`; const d = Math.floor(h / 24); if (d < 7) return `${d} day${d>1?'s':''} ago`; return fmtDate(ts); }
+
+let audioCtx = null; let audioUnlocked = false;
+function getAudioCtx() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; } } if (audioCtx.state === 'suspended') { audioCtx.resume().catch(()=>{}); } return audioCtx; }
+function unlockAudio() { const ctx = getAudioCtx(); if (!ctx || audioUnlocked) return; try { const buf = ctx.createBuffer(1, 1, 22050); const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0); audioUnlocked = true; } catch(e) {} }
+['click','touchstart','touchend','keydown','pointerdown'].forEach(ev => { document.addEventListener(ev, unlockAudio, { once: false, passive: true }); });
+function playNotifSound() { const ctx = getAudioCtx(); if (!ctx) return; try { const now = ctx.currentTime; const notes = [ { f: 783.99, t: 0.00, d: 0.35, v: 0.22 }, { f: 987.77, t: 0.16, d: 0.40, v: 0.24 }, { f: 1318.51, t: 0.34, d: 0.85, v: 0.20 } ]; const master = ctx.createGain(); master.gain.setValueAtTime(0.85, now); master.connect(ctx.destination); notes.forEach(n => { const osc1 = ctx.createOscillator(); const g1 = ctx.createGain(); osc1.type = 'sine'; osc1.frequency.setValueAtTime(n.f, now + n.t); osc1.frequency.exponentialRampToValueAtTime(n.f * 0.995, now + n.t + n.d); g1.gain.setValueAtTime(0.0001, now + n.t); g1.gain.exponentialRampToValueAtTime(n.v, now + n.t + 0.018); g1.gain.exponentialRampToValueAtTime(0.0001, now + n.t + n.d); osc1.connect(g1); g1.connect(master); osc1.start(now + n.t); osc1.stop(now + n.t + n.d + 0.08); }); if (navigator.vibrate) { try { navigator.vibrate([90, 50, 90]); } catch(e) {} } } catch(e) {} }
+
+function toast(type, title, msg, timeout=4000) {
+  const host = $('#toastHost');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = { success:'fa-circle-check', error:'fa-circle-exclamation', warning:'fa-triangle-exclamation', info:'fa-circle-info' };
+  el.innerHTML = `<i class="fa-solid ${icons[type]||icons.info} t-icon"></i><div class="t-body"><div class="t-title">${esc(title)}</div>${msg?`<div class="t-msg">${esc(msg)}</div>`:''}</div><button class="t-close"><i class="fa-solid fa-xmark"></i></button>`;
+  host.appendChild(el);
+  const close = () => { el.style.opacity = '0'; setTimeout(()=>el.remove(), 220); };
+  el.querySelector('.t-close').onclick = close;
+  setTimeout(close, timeout);
+}
+
+function openModal({ title, bodyHTML, footerHTML, onMount=null, extraClass='' }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb ' + extraClass;
+  wrap.innerHTML = `<div class="modal" role="dialog"><div class="mh"><h3>${title}</h3><button class="close-x"><i class="fa-solid fa-xmark"></i></button></div><div class="mbody">${bodyHTML}</div>${footerHTML?`<div class="mfoot">${footerHTML}</div>`:''}</div>`;
+  $('#modalHost').appendChild(wrap);
+  const close = () => { 
+    wrap.remove(); 
+    document.removeEventListener('keydown', escFn); 
+    if (extraClass === 'dm-modal' && State.dmListener) { State.dmListener(); State.dmListener = null; }
+  };
+  wrap.querySelector('.close-x').onclick = close;
+  wrap.addEventListener('click', (e)=>{ if (e.target === wrap) close(); });
+  const escFn = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', escFn);
+  if (onMount) onMount(wrap, close);
+  return { el: wrap, close };
+}
+
+function confirmDialog(title, message, danger=false) {
+  return new Promise(resolve => {
+    openModal({
+      title, bodyHTML: `<p>${esc(message)}</p>`,
+      footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn ${danger?'btn-danger':'btn-primary'}" data-x="ok">Confirm</button>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-x="c"]').onclick = () => { close(); resolve(false); };
+        el.querySelector('[data-x="ok"]').onclick = () => { close(); resolve(true); };
+      }
+    });
+  });
+}
+
+const THEME_DEFS = [
+  { id:'amoled', name:'AMOLED', dots:['#000','#8b5cf6','#22c55e'] },
+  { id:'cyber',  name:'Cyber Blue',  dots:['#04070f','#00a3ff','#38bdf8'] },
+  { id:'fire',   name:'Fire Red',    dots:['#0f0504','#ff4d2e','#fbbf24'] },
+  { id:'neon',   name:'Neon Purple', dots:['#06010d','#c026d3','#e879f9'] },
+  { id:'emerald',name:'Emerald',     dots:['#020c08','#10b981','#34d399'] },
+  { id:'gold',   name:'Royal Gold',  dots:['#0a0803','#d4af37','#f0cf6b'] },
+  { id:'ocean',  name:'Ocean Glass', dots:['#02121c','#06b6d4','#67e8f9'] },
+  { id:'light',  name:'Pure Light',  dots:['#f4f5f9','#6d28d9','#7c3aed'] }
+];
+
+let themeState = { mode: 'user', globalTheme: 'amoled', default: 'amoled', enabled: {}, userTheme: null, darkMode: true };
+
+function applyTheme(id) {
+  if (!THEME_DEFS.find(t => t.id === id)) id = 'amoled';
+  document.documentElement.setAttribute('data-theme', id);
+  try { localStorage.setItem('pe_theme', id); } catch(e) {}
+}
+
+function applyBgMode(isDark) {
+  try { localStorage.setItem('pe_bg', isDark ? 'dark' : 'light'); } catch(e) {}
+  
+  const toggle = $('#darkModeToggle');
+  const knob = $('#darkModeKnob');
+  if (toggle && knob) {
+    if (isDark) {
+      knob.style.left = '24px';
+      knob.style.background = 'var(--ac)';
+      toggle.style.background = 'var(--sf2)';
+    } else {
+      knob.style.left = '2px';
+      knob.style.background = 'var(--txm)';
+      toggle.style.background = 'var(--sf3)';
+    }
+  }
+  
+  if (typeof window.syncSystemBars === 'function') {
+    window.syncSystemBars(isDark);
+  }
+}
+
+let __initialTheme = 'amoled';
+let __initialBg = 'dark';
+try { 
+  __initialTheme = localStorage.getItem('pe_theme') || 'amoled'; 
+  __initialBg = localStorage.getItem('pe_bg') || 'dark';
+} catch(e) {}
+applyTheme(__initialTheme);
+applyBgMode(__initialBg === 'dark');
+
+function computeActiveTheme() { if (themeState.mode === 'global') return themeState.globalTheme || themeState.default || 'amoled'; const userPick = themeState.userTheme; if (userPick && THEME_DEFS.find(t => t.id === userPick)) { if (themeState.enabled[userPick] !== false) return userPick; } return themeState.default || 'amoled'; }
+function refreshTheme() { applyTheme(computeActiveTheme()); }
+async function loadThemeSettings() { try { const snap = await get(ref(db, 'themeSettings')); const cfg = snap.exists() ? snap.val() : {}; themeState.mode = cfg.mode || 'user'; themeState.globalTheme = cfg.globalTheme || 'amoled'; themeState.default = cfg.default || 'amoled'; themeState.enabled = cfg.enabled || {}; } catch (e) {} }
+async function loadUserTheme() { if (!State.user) { refreshTheme(); return; } try { const snap = await get(ref(db, 'users/' + State.user.uid + '/theme')); if (snap.exists()) themeState.userTheme = snap.val(); } catch (e) {} refreshTheme(); }
+
+const splashEl = $('#splash');
+function hideSplash() { splashEl.classList.add('hide'); setTimeout(() => { splashEl.style.display = 'none'; }, 400); }
+setTimeout(() => { if (splashEl && !splashEl.classList.contains('hide')) hideSplash(); }, 10000);
+
+$$('.auth-tab').forEach(t => t.onclick = () => {
+  $$('.auth-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const isLogin = t.dataset.tab === 'login';
+  $('#loginForm').hidden = !isLogin;
+  $('#registerForm').hidden = isLogin;
+  $('#authAlert').innerHTML = '';
+});
+
+$('#loginPassToggle').onclick = () => { const p = $('#loginPass'); const show = p.type==='password'; p.type = show ? 'text' : 'password'; $('#loginPassToggle').querySelector('i').className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'; };
+$('#regPassToggle').onclick = () => { const p = $('#regPass'); const show = p.type==='password'; p.type = show ? 'text' : 'password'; $('#regPassToggle').querySelector('i').className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'; };
+
+$('#loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('#errLoginEmail').textContent = ''; $('#errLoginPass').textContent = ''; $('#authAlert').innerHTML = '';
+  const email = $('#loginEmail').value.trim(); const pass = $('#loginPass').value;
+  let ok = true;
+  if (!/^\S+@\S+\.\S+$/.test(email)) { $('#errLoginEmail').textContent = 'Enter a valid email'; ok=false; }
+  if (pass.length < 6) { $('#errLoginPass').textContent = 'Min 6 characters'; ok=false; }
+  if (!ok) return;
+  const btn = $('#loginBtn'); btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> Signing in…';
+  try { await signInWithEmailAndPassword(auth, email, pass); }
+  catch (err) { $('#authAlert').innerHTML = `<div class="alert error"><i class="fa-solid fa-circle-exclamation"></i><span>${esc(mapAuthError(err))}</span></div>`; }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In'; }
+};
+
+$('#registerForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('#authAlert').innerHTML = '';
+  ['errRegName','errRegEmail','errRegFfUid','errRegPass'].forEach(id => $('#'+id).textContent='');
+  const name = $('#regName').value.trim(); 
+  const email = $('#regEmail').value.trim(); 
+  const ffUid = $('#regFfUid').value.trim(); 
+  const pass = $('#regPass').value; 
+  const terms = $('#regTerms').checked;
+  const refCodeInput = $('#regRefCode').value.trim().toUpperCase();
+  
+  let ok = true;
+  if (name.length < 2) { $('#errRegName').textContent = 'Name too short'; ok=false; }
+  if (!/^\S+@\S+\.\S+$/.test(email)) { $('#errRegEmail').textContent = 'Invalid email'; ok=false; }
+  if (!/^\d{6,15}$/.test(ffUid)) { $('#errRegFfUid').textContent = '6-15 digits'; ok=false; }
+  if (pass.length < 6) { $('#errRegPass').textContent = 'Min 6 characters'; ok=false; }
+  if (!terms) { toast('warning','Terms Required',''); ok=false; }
+  if (!ok) return;
+
+  const btn = $('#registerBtn'); btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> Creating…';
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const uid = cred.user.uid;
+    try { await updateProfile(cred.user, { displayName: name }); } catch {}
+    const now = Date.now();
+    const refCode = 'PE' + uid.slice(0,5).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+    
+    let startingBalance = 0;
+    let referredByUid = null;
+
+    if (refCodeInput) {
+      try {
+        const rSnap = await get(query(ref(db, 'users'), orderByChild('referralCode'), equalTo(refCodeInput)));
+        if (rSnap.exists()) {
+           rSnap.forEach(c => { 
+             const u = c.val(); 
+             if (u.referralCode === refCodeInput && c.key !== uid) { referredByUid = c.key; } 
+           });
+        }
+      } catch(e) { console.log("Referral query error", e); }
+    }
+
+    let signupBonus = 2, refBonus = 2;
+    try {
+      const rSet = await get(ref(db, 'appSettings/referralLinks'));
+      if (rSet.exists()) {
+        const rv = rSet.val();
+        signupBonus = Number(rv.signupBonus) || 2;
+        refBonus = Number(rv.referralBonus) || 2;
+      }
+    } catch(e){}
+
+    if (referredByUid) startingBalance = signupBonus;
+
+    await set(ref(db, 'users/' + uid), { uid, displayName: name, email, freeFireUid: ffUid, status: 'active', referralCode: refCode, referredBy: referredByUid || null, createdAt: now, updatedAt: now, photoUrl: '', balance: startingBalance, coins: 0, diamonds: 0 });
+    await set(ref(db, 'wallets/' + uid), { balance: startingBalance, reserved: 0, updatedAt: now });
+    await set(ref(db, 'publicProfiles/' + uid), { uid, displayName: name, photoUrl: '', freeFireUid: ffUid, createdAt: now });
+    
+    if (referredByUid) {
+      if (startingBalance > 0) {
+         const txRef = push(ref(db, 'walletTransactions'));
+         await set(txRef, { id: txRef.key, userId: uid, type: 'referral_bonus', amount: startingBalance, status: 'completed', createdAt: now });
+      }
+      
+      const refRef = push(ref(db, 'referrals'));
+      await set(refRef, { id: refRef.key, referrerId: referredByUid, referredId: uid, status: 'credited', rewardAmount: refBonus, createdAt: now });
+      
+      const refWalletT = await get(ref(db, 'wallets/' + referredByUid + '/balance'));
+      await set(ref(db, 'wallets/' + referredByUid + '/balance'), (Number(refWalletT.val()) || 0) + refBonus);
+      
+      const refTx = push(ref(db, 'walletTransactions'));
+      await set(refTx, { id: refTx.key, userId: referredByUid, type: 'referral', amount: refBonus, relatedId: uid, status: 'completed', createdAt: now });
+      
+      const notif = push(ref(db, 'notifications/' + referredByUid));
+      await set(notif, { id: notif.key, type: 'reward', title: '🎉 Referral Bonus!', body: `You earned ₹${refBonus} because ${name} joined using your code.`, read: false, createdAt: now });
+    }
+
+    toast('success','Welcome!','');
+  } catch (err) { $('#authAlert').innerHTML = `<div class="alert error"><i class="fa-solid fa-circle-exclamation"></i><span>${esc(mapAuthError(err))}</span></div>`; }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account'; }
+};
+
+$('#forgotLink').onclick = async (e) => {
+  e.preventDefault();
+  const email = $('#loginEmail').value.trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) { toast('warning','Enter Email',''); return; }
+  try { await sendPasswordResetEmail(auth, email); toast('success','Reset Email Sent',''); }
+  catch (err) { toast('error','Failed',mapAuthError(err)); }
+};
+
+function mapAuthError(err) {
+  const c = err?.code || '';
+  if (c.includes('email-already-in-use')) return 'Email already registered.';
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found')) return 'Invalid email or password.';
+  if (c.includes('weak-password')) return 'Password too weak.';
+  if (c.includes('invalid-email')) return 'Invalid email.';
+  if (c.includes('too-many-requests')) return 'Too many attempts.';
+  if (c.includes('network')) return 'Network error.';
+  return err?.message || 'Something went wrong.';
+}
+
+onAuthStateChanged(auth, async (user) => {
+  detachAll();
+  if (!user) {
+    State.user = null; State.profile = null;
+    $('#appShell').classList.remove('active');
+    $('#authScreen').style.display = 'grid';
+    hideSplash();
+    return;
+  }
+  const snap = await get(ref(db, 'users/' + user.uid)).catch(() => null);
+  if (!snap || !snap.exists()) {
+    const now = Date.now();
+    await set(ref(db, 'users/' + user.uid), { uid: user.uid, displayName: user.displayName || 'Player', email: user.email || '', freeFireUid: '', status: 'active', createdAt: now, updatedAt: now, referralCode: 'PE' + user.uid.slice(0,5).toUpperCase(), diamonds: 0 });
+    await set(ref(db, 'wallets/' + user.uid), { balance: 0, reserved: 0, updatedAt: now });
+    State.profile = (await get(ref(db, 'users/' + user.uid))).val();
+  } else { State.profile = snap.val(); }
+
+  if (State.profile.status === 'suspended' || State.profile.status === 'banned') {
+    await signOut(auth);
+    $('#authAlert').innerHTML = `<div class="alert error"><i class="fa-solid fa-ban"></i><span>Your account is ${esc(State.profile.status)}. Contact support.</span></div>`;
+    hideSplash();
+    return;
+  }
+  
+  State.user = user;
+  $('#authScreen').style.display = 'none';
+  
+  splashEl.style.display = 'grid';
+  splashEl.classList.remove('hide');
+
+  await loadThemeSettings();
+  await loadUserTheme();
+  
+  const activeTheme = computeActiveTheme();
+  applyTheme(activeTheme);
+  try { localStorage.setItem('pe_theme', activeTheme); } catch(e) {}
+  
+  $('#appShell').classList.add('active');
+  
+  initApp();
+  
+  setTimeout(() => hideSplash(), 200);
+});
+
+function trackListener(r, cb) { onValue(r, cb, (e) => console.warn('listen err', e)); State.listeners.push({ ref: r, cb }); }
+function detachAll() { State.listeners.forEach(({ ref, cb }) => { try { off(ref,'value',cb); } catch {} }); State.listeners = []; if(State.dmListener){State.dmListener();State.dmListener=null;} }
+
+async function initApp() {
+  updateGreeting();
+  await loadCleanupSettings();
+  await loadVipSettings();
+  await loadReferralSettings();
+  loadProfileUI();
+  await loadChannels();
+  attachListeners();
+  navigate('home');
+  initSpinWheel(); // This will do nothing now since the feature is locked
+  
+  setTimeout(() => {
+    if (State.notifications && State.notifications.some(n => !n.read)) {
+      playNotifSound();
+      openNotifications();
+    }
+  }, 2500);
+}
+
+async function loadVipSettings() {
+  try {
+    const snap = await get(ref(db, 'vipSettings'));
+    if (snap.exists()) State.vipSettings = snap.val();
+    else State.vipSettings = {
+      plans: {
+        p1: { days: 1, rupees: 10, diamonds: 100 },
+        p7: { days: 7, rupees: 49, diamonds: 500 },
+        p15: { days: 15, rupees: 99, diamonds: 1000 },
+        p30: { days: 30, rupees: 149, diamonds: 1800 }
+      }
+    };
+  } catch(e) {}
+}
+
+async function loadReferralSettings() {
+  try {
+    const snap = await get(ref(db, 'appSettings/referralLinks'));
+    if (snap.exists()) State.referralSettings = snap.val();
+  } catch(e) {}
+  if (State.user) {
+    try {
+      const rSnap = await get(query(ref(db, 'referrals'), orderByChild('referrerId'), equalTo(State.user.uid)));
+      const arr = [];
+      rSnap.forEach(c => { const v = c.val(); if (isObj(v) && isWithinRetention(v.createdAt)) { v.id = c.key; arr.push(v); } });
+      State.referrals = arr;
+    } catch(e) {}
+  }
+}
+
+async function loadCleanupSettings() {
+  try {
+    const snap = await get(ref(db, 'appSettings/cleanup'));
+    if (snap.exists()) {
+      const c = snap.val();
+      State.cleanupDays = typeof c.days !== 'undefined' ? Number(c.days) : 7;
+      State.retentionMs = State.cleanupDays * 24 * 60 * 60 * 1000;
+    }
+  } catch(e) {}
+}
+
+function updateGreeting() {
+  const n = State.profile?.displayName || 'Player';
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  $('#userGreeting').innerHTML = `${greet}, ${n} <span id="topBlueTick"></span>`;
+  
+  if (isVipActive()) {
+    $('#topBlueTick').innerHTML = '<i class="fa-solid fa-circle-check blue-tick"></i>';
+    if($('#profBlueTick')) $('#profBlueTick').innerHTML = '<i class="fa-solid fa-circle-check blue-tick"></i>';
+  } else {
+    $('#topBlueTick').innerHTML = '';
+    if($('#profBlueTick')) $('#profBlueTick').innerHTML = '';
+  }
+}
+
+function loadProfileUI() {
+  const p = State.profile || {};
+  $('#profileName').innerHTML = `${p.displayName || 'Player'} <span id="profBlueTick"></span>`;
+  $('#profileEmail').textContent = p.email || '';
+  $('#profileFfUid').textContent = p.freeFireUid || 'Set FF UID';
+  $('#profileJoined').textContent = fmtDate(p.createdAt);
+  $('#refCode').textContent = p.referralCode || '—';
+  
+  const av = $('#profileAvatar');
+  if (p.photoUrl && p.photoUrl.startsWith('data:image')) {
+    av.innerHTML = `<img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+  } else if (p.profileEmoji) {
+    av.innerHTML = `<span style="font-size:2.2rem; line-height:1;">${p.profileEmoji}</span>`;
+    av.style.background = 'linear-gradient(135deg,var(--sf3),var(--sf2))'; 
+  } else {
+    av.textContent = (p.displayName || 'P').charAt(0).toUpperCase();
+    av.style.background = 'linear-gradient(135deg,var(--ac),var(--ac2))';
+  }
+  
+  const diamonds = Number(p.diamonds || 0);
+  const walletD = $('#walletDiamonds'); if (walletD) walletD.textContent = diamonds.toLocaleString('en-IN');
+
+  const homeBuyVipBtn = $('#homeBuyVipBtn');
+  const vipExpiryText = $('#vipExpiryText');
+  const vipCardSubText = $('#vipCardSubText');
+  
+  if (homeBuyVipBtn && vipExpiryText) {
+    if (isVipActive()) {
+      homeBuyVipBtn.innerHTML = '<i class="fa-solid fa-crown"></i> Extend VIP';
+      homeBuyVipBtn.style.display = 'flex'; 
+      vipExpiryText.style.display = 'block';
+      
+      const now = Date.now();
+      const expiry = p.vipExpiry;
+      const diffMs = expiry - now;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      let timeText = '';
+      if (diffDays >= 1) {
+        timeText = `Expires in ${diffDays} Day${diffDays > 1 ? 's' : ''}`;
+      } else {
+        const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+        timeText = `Expires in ${diffHours} Hour${diffHours > 1 ? 's' : ''}`;
+      }
+      
+      vipExpiryText.innerHTML = `<i class="fa-solid fa-crown"></i> VIP Active<br><span style="color:var(--txm); font-size:0.68rem; font-weight:500;">${timeText}</span>`;
+      if(vipCardSubText) vipCardSubText.textContent = `VIP Active till ${fmtDate(expiry)}. Click to Extend.`;
+    } else {
+      homeBuyVipBtn.innerHTML = '<i class="fa-solid fa-crown"></i> Buy VIP';
+      homeBuyVipBtn.style.display = 'flex';
+      vipExpiryText.style.display = 'none';
+      if(vipCardSubText) vipCardSubText.textContent = `Blue Tick, Themes, World Chat & Direct Admin DM`;
+    }
+  }
+
+  renderThemeGrid();
+  updateGreeting();
+}
+
+async function loadChannels() {
+  try {
+    const [supSnap, linksSnap] = await Promise.all([ get(ref(db, 'appSettings/supportiveLinks')).catch(()=>null), get(ref(db, 'appSettings/support')).catch(()=>null) ]);
+    const card = $('#channelsCard'); const host = $('#channelsHost');
+    const v1 = supSnap?.exists() ? supSnap.val() : {}; const v2 = linksSnap?.exists() ? linksSnap.val() : {};
+    let tgUser = v1.telegram || v2.telegram || 'PunjabEsports'; let waNum  = v1.whatsapp || v2.whatsapp || '+919876543210'; let igUser = v1.instagram || v2.instagram || 'punjab_esports'; let email  = v1.gmail || v2.email || 'support@punjabesports.com';
+    let html = '';
+    if (waNum) { const cleanWa = waNum.replace(/[^0-9]/g, ''); const link = waNum.startsWith('http') ? waNum : `https://wa.me/${cleanWa}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn whatsapp"><div class="channel-btn-icon"><i class="fa-brands fa-whatsapp"></i></div><div class="cb-text"><b>WhatsApp</b><small>Get updates & chat directly on WhatsApp</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
+    if (tgUser) { const cleanTg = tgUser.replace(/^@/, '').replace(/^https?:\/\/t\.me\//,'').replace(/\/$/,''); const link = tgUser.startsWith('http') ? tgUser : `https://t.me/${cleanTg}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn telegram"><div class="channel-btn-icon"><i class="fa-brands fa-telegram"></i></div><div class="cb-text"><b>Telegram</b><small>Join our official channel for latest announcements</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
+    if (igUser) { const cleanIg = igUser.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//,'').replace(/\/$/,''); const link = igUser.startsWith('http') ? igUser : `https://instagram.com/${cleanIg}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn instagram"><div class="channel-btn-icon"><i class="fa-brands fa-instagram"></i></div><div class="cb-text"><b>Instagram</b><small>Follow for match highlights & stories</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
+    if (email) { html += `<a href="mailto:${esc(email)}" class="channel-btn email"><div class="channel-btn-icon"><i class="fa-solid fa-envelope"></i></div><div class="cb-text"><b>Email Support</b><small>${esc(email)}</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
+    host.innerHTML = html; card.hidden = false;
+  } catch(e) { $('#channelsCard').hidden = false; }
+}
+
+function attachListeners() {
+  const uid = State.user.uid;
+
+  trackListener(ref(db, 'users/' + uid), (snap) => {
+    if (snap.exists()) {
+      State.profile = snap.val();
+      loadProfileUI();
+    }
+  });
+
+  trackListener(ref(db, 'wallets/' + uid), (snap) => {
+    const w = snap.val() || { balance: 0, reserved: 0 };
+    State.wallet = isObj(w) ? w : { balance: 0, reserved: 0 };
+    const balanceStr = fmtMoney(State.wallet.balance || 0);
+    $('#homeBalance').textContent = balanceStr;
+    $('#walletBalance').textContent = balanceStr;
+  });
+
+  trackListener(query(ref(db, 'worldChat'), orderByChild('createdAt'), limitToLast(50)), (snap) => {
+    const arr = []; snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; if (v.deleted) return; arr.push(v); });
+    State.chatMessages = arr.filter(m => !State.localDeletedChats.includes(m.id));
+    if ($('#chatMessages') && $('#chatMessages').parentElement) renderChatMessages();
+  });
+
+  trackListener(ref(db, 'tournaments'), (snap) => {
+    State.tournaments = [];
+    snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; v.id = c.key; State.tournaments.push(v); });
+    State.tournaments.sort((a, b) => {
+      const timeA = new Date((a.matchDate || '2099-01-01') + 'T' + (a.matchTime || '00:00')).getTime();
+      const timeB = new Date((b.matchDate || '2099-01-01') + 'T' + (b.matchTime || '00:00')).getTime();
+      return timeA - timeB;
+    });
+    renderHomeMatches(); renderTourList(); renderMyMatches();
+  });
+
+  trackListener(ref(db, 'matchResults'), (snap) => {
+    State.matchResultsCache = {};
+    if (snap.exists()) {
+      snap.forEach(c => { const v = c.val(); if (isObj(v)) State.matchResultsCache[c.key] = v; });
+    }
+    renderMyMatches();
+  });
+
+  trackListener(query(ref(db, 'registrations'), orderByChild('userId'), equalTo(uid)), (snap) => {
+    State.myRegistrations = [];
+    snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; if (isWithinRetention(v.createdAt)) { v.id = c.key; State.myRegistrations.push(v); } });
+    renderMyMatches(); updateStats(); updateWalletStats();
+  });
+
+  trackListener(query(ref(db, 'walletTransactions'), orderByChild('userId'), equalTo(uid)), (snap) => {
+    const arr = []; snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; if (isWithinRetention(v.createdAt)) arr.push(v); });
+    arr.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    State.transactions = arr;
+    renderTransactions(); updateWalletStats();
+  });
+
+  trackListener(query(ref(db, 'notifications/' + uid), orderByChild('createdAt'), limitToLast(50)), (snap) => {
+    const arr = []; snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; if (isWithinRetention(v.createdAt)) { v.id = c.key; arr.push(v); } });
+    arr.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    
+    const filteredArr = arr.filter(n => {
+      if (n.type === 'announcement' || n.type === 'custom_message') return false;
+      if (n.type === 'match_result' && n.matchId) {
+         const res = State.matchResultsCache[n.matchId];
+         if (!res || res.status !== 'approved') return false; 
+      }
+      return true;
+    });
+
+    State.notifications = filteredArr;
+    const unread = filteredArr.filter(n => !n.read).length;
+    const dot = $('#notifDot');
+    if (dot) { if (unread > 0) { dot.hidden = false; dot.textContent = unread > 99 ? '99+' : unread; } else { dot.hidden = true; } }
+
+    let maxTs = 0;
+    filteredArr.forEach(n => { if (n.createdAt > maxTs) maxTs = n.createdAt; });
+    
+    if (State.lastNotifTs && maxTs > State.lastNotifTs) {
+      const newest = filteredArr[0];
+      if (newest && newest.createdAt > State.lastNotifTs && !newest.read) {
+        playNotifSound();
+        const bell = $('#notifBtn');
+        bell.classList.remove('bell-ring');
+        void bell.offsetWidth;
+        bell.classList.add('bell-ring');
+        
+        if (!$('.notif-modal')) {
+          openNotifications();
+        }
+      }
+    }
+    State.lastNotifTs = maxTs;
+  });
+
+  trackListener(query(ref(db, 'announcements'), orderByChild('createdAt'), limitToLast(5)), (snap) => {
+    const arr = []; snap.forEach(c => { const v = c.val(); if (!isObj(v)) return; if (v.active !== false) arr.push(v); });
+    arr.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    renderAnnouncements(arr);
+  });
+
+  trackListener(ref(db, 'themeSettings'), (snap) => {
+    const cfg = snap.exists() ? snap.val() : {};
+    themeState.mode = cfg.mode || 'user'; themeState.globalTheme = cfg.globalTheme || 'amoled'; themeState.default = cfg.default || 'amoled'; themeState.enabled = cfg.enabled || {};
+    refreshTheme();
+    if (State.currentPage === 'profile') renderThemeGrid();
+  });
+
+  trackListener(ref(db, 'appSettings/cleanup'), (snap) => {
+    if (snap.exists()) {
+      const c = snap.val(); State.cleanupDays = typeof c.days !== 'undefined' ? Number(c.days) : 7; State.retentionMs = State.cleanupDays * 24 * 60 * 60 * 1000;
+      renderTransactions(); renderMyMatches();
+    }
+  });
+
+  trackListener(ref(db, 'vipSettings'), (snap) => {
+    if (snap.exists()) State.vipSettings = snap.val();
+  });
+
+  trackListener(query(ref(db, 'referrals'), orderByChild('referrerId'), equalTo(uid)), (snap) => {
+    const arr = [];
+    snap.forEach(c => { const v = c.val(); if (isObj(v) && isWithinRetention(v.createdAt)) { v.id = c.key; arr.push(v); } });
+    State.referrals = arr;
+    renderReferralStats();
+  });
+
+  trackListener(ref(db, 'appSettings/supportiveLinks'), () => loadChannels());
+  trackListener(ref(db, 'appSettings/support'), () => loadChannels());
+  get(ref(db, 'appSettings')).then(s => { State.settings = s.val() || {}; }).catch(()=>{});
+}
+
+function renderReferralStats() {
+  const refs = State.referrals || [];
+  const total = refs.length;
+  let earned = 0, pending = 0;
+  refs.forEach(r => { if (r.status === 'credited') earned += Number(r.rewardAmount || 0); else pending++; });
+  const elTotal = $('#refCount'); if (elTotal) elTotal.textContent = total;
+  const elEarned = $('#refEarned'); if (elEarned) elEarned.textContent = fmtMoney(earned);
+  const elPending = $('#refPending'); if (elPending) elPending.textContent = pending;
+}
+
+function navigate(page) {
+  State.currentPage = page;
+  $$('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  if (el) el.classList.add('active');
+  $$('.bn-item').forEach(b => b.classList.toggle('active', b.dataset.nav === page));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (page === 'profile') { loadProfileExtras(); renderThemeGrid(); loadChannels(); renderReferralStats(); }
+}
+
+$$('.bn-item').forEach(b => b.onclick = () => navigate(b.dataset.nav));
+$$('[data-nav]').forEach(b => { if (!b.classList.contains('bn-item')) b.onclick = () => navigate(b.dataset.nav); });
+
+$('#homeAddBtn').onclick = () => openAddBalance();
+$('#homeWithdrawBtn').onclick = () => openWithdraw();
+$('#walletAddBtn').onclick = () => openAddBalance();
+$('#walletWithdrawBtn').onclick = () => openWithdraw();
+$('#notifBtn').onclick = () => openNotifications();
+$('#rulesBtn').onclick = () => openRules();
+$('#editProfileBtn').onclick = () => openEditProfile();
+$('#openVipStoreBtn').onclick = () => openVipStore();
+$('#homeBuyVipBtn').onclick = () => openVipStore();
+$('#chatBtn').onclick = () => openWorldChat();
+$('#shareRefBtn').onclick = shareReferral;
+$('#logoutBtn').onclick = async () => {
+  if (!await confirmDialog('Logout','End your session?')) return;
+  detachAll();
+  await signOut(auth);
+  toast('success','Logged out','');
+};
+
+$('#darkModeToggle').onclick = () => {
+  const currentBg = document.documentElement.getAttribute('data-bg');
+  const nextBg = currentBg === 'dark' ? 'light' : 'dark';
+  applyBgMode(nextBg === 'dark');
+};
+
+function renderHomeMatches() {
+  const host = $('#homeMatches');
+  const list = State.tournaments.filter(t => t.status === 'upcoming' || t.status === 'ongoing');
+  if (!list.length) { host.innerHTML = `<div class="empty-state"><div class="es-icon"><i class="fa-solid fa-trophy"></i></div><h3>No matches yet</h3></div>`; return; }
+  host.innerHTML = list.map(m => matchCardHTML(m)).join('');
+  bindMatchCardClicks(host);
+}
+
+function updateStats() {
+  const regs = State.myRegistrations || [];
+  $('#statPlayed').textContent = regs.filter(r => r.status === 'confirmed').length;
+  let wins = 0, kills = 0;
+  regs.forEach(r => {
+    const res = State.matchResultsCache[r.matchId];
+    if (res && res.entries && res.entries[r.userId]) {
+      const e = res.entries[r.userId];
+      if (Number(e.rank) === 1) wins++;
+      kills += Number(e.kills || 0);
+    }
+  });
+  $('#statWins').textContent = wins;
+  $('#statKills').textContent = kills;
+}
+
+function updateWalletStats() {
+  const txs = State.transactions || [];
+  let deposited = 0, won = 0, pending = 0;
+  txs.forEach(t => {
+    if (t.currency === 'DIAMONDS') return;
+    if (t.type === 'deposit' && t.status === 'completed') deposited += Number(t.amount||0);
+    if ((t.type === 'match_reward' || t.type === 'prize' || t.type === 'kill_reward' || t.type === 'referral') && t.status === 'completed') won += Number(t.amount||0);
+    if (t.status === 'pending') pending += Number(t.amount||0);
+  });
+  const wd = $('#walletDeposited'); if (wd) wd.textContent = fmtMoney(deposited);
+  const ww = $('#walletWon'); if (ww) ww.textContent = fmtMoney(won);
+  const wp = $('#walletPending'); if (wp) wp.textContent = fmtMoney(pending);
+}
+
+function renderAnnouncements(list) {
+  const host = $('#announcementHost');
+  if (!list.length) { host.innerHTML = ''; return; }
+  host.innerHTML = list.slice(0,2).map(a => `<div class="card mb-3" style="border-left:4px solid var(--ac)"><div class="flex-between mb-2"><b>${esc(a.title || '')}</b><span class="badge neutral">${fmtDate(a.createdAt)}</span></div><p style="margin:0;font-size:.85rem">${esc(a.body || '')}</p></div>`).join('');
+}
+
+$$('#statusTabs .filter-chip').forEach(c => c.onclick = () => { $$('#statusTabs .filter-chip').forEach(x => x.classList.remove('active')); c.classList.add('active'); State.filters.status = c.dataset.status; renderTourList(); });
+$$('#modeTabs .filter-chip').forEach(c => c.onclick = () => { $$('#modeTabs .filter-chip').forEach(x => x.classList.remove('active')); c.classList.add('active'); State.filters.mode = c.dataset.mode; renderTourList(); });
+$('#tourSearch').oninput = (e) => { State.filters.search = e.target.value.trim().toLowerCase(); renderTourList(); };
+
+const typeDropdownBtn = $('#typeDropdownBtn');
+const typeDropdownMenu = $('#typeDropdownMenu');
+if(typeDropdownBtn && typeDropdownMenu) {
+  typeDropdownBtn.onclick = (e) => { e.stopPropagation(); typeDropdownMenu.classList.toggle('show'); };
+  document.addEventListener('click', (e) => {
+    if (!typeDropdownBtn.contains(e.target) && !typeDropdownMenu.contains(e.target)) {
+      typeDropdownMenu.classList.remove('show');
+    }
+  });
+  $$('#typeDropdownMenu .premium-item').forEach(item => {
+    item.onclick = () => {
+      $$('#typeDropdownMenu .premium-item').forEach(x => x.classList.remove('active'));
+      item.classList.add('active');
+      State.filters.type = item.dataset.type;
+      const label = item.textContent.replace('All Entries', 'All').replace('Free Entry', 'Free').replace('Paid Entry', 'Paid').replace('✓', '').trim();
+      $('#typeDropdownText').textContent = label;
+      typeDropdownMenu.classList.remove('show');
+      renderTourList();
+    };
+  });
+}
+
+function renderTourList() {
+  const host = $('#tourList');
+  let list = State.tournaments.filter(t => {
+    if (State.filters.status !== 'all' && t.status !== State.filters.status) return false;
+    if (State.filters.mode && t.mode !== State.filters.mode) return false;
+    if (State.filters.type === 'free' && Number(t.entryFee) > 0) return false;
+    if (State.filters.type === 'paid' && Number(t.entryFee) === 0) return false;
+    if (State.filters.search) { const s = ((t.title||'') + ' ' + (t.id||'')).toLowerCase(); if (!s.includes(State.filters.search)) return false; }
+    return true;
+  });
+  if (!list.length) { host.innerHTML = `<div class="empty-state"><div class="es-icon"><i class="fa-solid fa-trophy"></i></div><h3>No matches found</h3></div>`; return; }
+  host.innerHTML = list.map(m => matchCardHTML(m)).join('');
+  bindMatchCardClicks(host);
+}
+
+function matchCardHTML(m) {
+  const reg = Number(m.registeredCount || 0);
+  const cap = Number(m.capacity || 0);
+  const pct = cap ? Math.min(100, (reg/cap)*100) : 0;
+  const isFull = reg >= cap;
+  const modeCls = { BR:'br', CS:'cs', LW:'lw' }[m.mode] || 'neutral';
+  const modeName = { BR:'Battle Royale', CS:'Clash Squad', LW:'Lone Wolf' }[m.mode] || m.mode;
+
+  let bannerHTML = `<div class="match-banner"><i class="fa-solid fa-image"></i></div>`;
+  if (m.bannerUrl && isValidUrl(m.bannerUrl)) { bannerHTML = `<div class="match-banner"><img src="${esc(m.bannerUrl)}" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\'></i>'" alt=""></div>`; }
+
+  const dateStr = formatMatchDateTime(m.matchDate, m.matchTime);
+
+  return `<div class="match-card" data-match-id="${esc(m.id)}">
+    ${bannerHTML}
+    <div class="match-body">
+      <div class="flex-between mb-2">
+        <span class="badge ${modeCls}">${esc(modeName)}</span>
+        <span class="badge ${m.status}">${esc(m.status)}</span>
+      </div>
+      <div class="match-title">${esc(m.title || 'Untitled')}</div>
+      <div class="match-meta">
+        <span><i class="fa-regular fa-calendar"></i> ${esc(dateStr)}</span>
+        <span><i class="fa-solid fa-indian-rupee-sign"></i> ${m.entryFee > 0 ? fmtMoney(m.entryFee) : 'FREE'}</span>
+        ${m.perKill > 0 ? `<span><i class="fa-solid fa-crosshairs"></i> ${fmtMoney(m.perKill)}/kill</span>` : ''}
+      </div>
+      <div class="match-slot-row">
+        <div class="slot-meta"><span>${reg} / ${cap} slots</span><span>${isFull ? 'FULL' : (cap - reg) + ' left'}</span></div>
+        <div class="slot-bar"><div class="slot-fill ${isFull?'full':''}" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindMatchCardClicks(root) { root.querySelectorAll('[data-match-id]').forEach(el => { el.onclick = () => openMatchDetails(el.dataset.matchId); }); }
+
+async function openMatchDetails(matchId) {
+  const m = State.tournaments.find(t => t.id === matchId);
+  if (!m) { toast('error','Not found',''); return; }
+  const myReg = State.myRegistrations.find(r => r.matchId === matchId && r.status === 'confirmed');
+  const reg = Number(m.registeredCount || 0);
+  const cap = Number(m.capacity || 0);
+  const isFull = reg >= cap;
+  const pct = cap ? Math.min(100, (reg/cap)*100) : 0;
+
+  let bannerHTML = '';
+  if (m.bannerUrl && isValidUrl(m.bannerUrl)) { bannerHTML = `<img src="${esc(m.bannerUrl)}" onerror="this.style.display='none'" style="width:100%;height:180px;object-fit:cover;border-radius:14px;margin-bottom:14px">`; }
+
+  const modeName = { BR:'Battle Royale', CS:'Clash Squad', LW:'Lone Wolf' }[m.mode] || m.mode;
+
+  let myResultHTML = '';
+  const res = State.matchResultsCache[matchId];
+  if (res && res.entries && res.entries[State.user.uid]) {
+    const e = res.entries[State.user.uid];
+    let rankText = `Rank: ${e.rank || '-'}`;
+    if(Number(e.rank) === 1) rankText = '🥇 Rank #1';
+    else if(Number(e.rank) === 2) rankText = '🥈 Rank #2';
+    else if(Number(e.rank) === 3) rankText = '🥉 Rank #3';
+
+    if(res.status === 'approved') {
+      myResultHTML = `
+        <div class="alert success mt-3" style="background:var(--oks);color:var(--ok);border-color:rgba(34,197,94,.3);flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="font-weight:700;font-size:1rem"><i class="fa-solid fa-trophy"></i> Your Result (Approved)</div>
+          <div style="display:flex;gap:16px;font-size:.9rem">
+            <span>${rankText}</span>
+            <span><i class="fa-solid fa-crosshairs"></i> ${e.kills || 0} kills</span>
+            <span style="font-weight:700;color:var(--ok)">+${fmtMoney(e.reward || 0)}</span>
+          </div>
+        </div>
+      `;
+    } else if (res.status === 'pending_approval') {
+      myResultHTML = `
+        <div class="alert info mt-3" style="background:var(--infs);color:var(--inf);border-color:rgba(59,130,246,.3);flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="font-weight:700;font-size:1rem"><i class="fa-solid fa-hourglass-half"></i> Result Pending Approval</div>
+          <div style="display:flex;gap:16px;font-size:.9rem">
+            <span>${rankText}</span>
+            <span><i class="fa-solid fa-crosshairs"></i> ${e.kills || 0} kills</span>
+            <span style="font-weight:700;color:var(--inf)">Est: ${fmtMoney(e.reward || 0)}</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  let roomHTML = '';
+  if (m.status === 'ongoing' && myReg) {
+    try {
+      const snap = await get(ref(db, 'privateRoomCredentials/' + matchId));
+      if (snap.exists()) {
+        const r = snap.val();
+        roomHTML = `<div class="room-box mt-3"><div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ac2);margin-bottom:8px"><i class="fa-solid fa-key"></i> Room Credentials</div><div class="room-row"><span class="rk">Room ID</span><span class="rv">${esc(r.roomId || '—')} <button class="copy-btn" data-copy="${esc(r.roomId||'')}">Copy</button></span></div><div class="room-row"><span class="rk">Password</span><span class="rv">${esc(r.roomPass || '—')} <button class="copy-btn" data-copy="${esc(r.roomPass||'')}">Copy</button></span></div></div>`;
+      } else { roomHTML = `<div class="alert info mt-3"><i class="fa-solid fa-clock"></i><span>Room credentials will be added shortly.</span></div>`; }
+    } catch (e) { roomHTML = `<div class="alert warning mt-3"><i class="fa-solid fa-lock"></i><span>Credentials available to confirmed participants only.</span></div>`; }
+  } else if (m.status === 'upcoming' && myReg) {
+    roomHTML = `<div class="alert info mt-3"><i class="fa-solid fa-lock"></i><span>Room credentials revealed when match starts.</span></div>`;
+  }
+
+  let footerHTML = `<button class="btn btn-ghost w-100" data-x="close">Close</button>`;
+  if (m.status === 'upcoming') {
+    if (myReg) footerHTML = `<button class="btn btn-success w-100" disabled><i class="fa-solid fa-check"></i> Already Joined</button>`;
+    else if (isFull) footerHTML = `<button class="btn btn-outline w-100" disabled><i class="fa-solid fa-ban"></i> Match Full</button>`;
+    else footerHTML = `<button class="btn btn-primary w-100" data-x="join"><i class="fa-solid fa-right-to-bracket"></i> Join Match</button>`;
+  } else if (m.status === 'ongoing') footerHTML = `<button class="btn btn-outline w-100" disabled><i class="fa-solid fa-play"></i> Match in Progress</button>`;
+  else if (m.status === 'completed') footerHTML = `<button class="btn btn-outline w-100" disabled><i class="fa-solid fa-flag-checkered"></i> Completed</button>`;
+  else if (m.status === 'cancelled') footerHTML = `<button class="btn btn-danger w-100" disabled><i class="fa-solid fa-ban"></i> Cancelled</button>`;
+
+  openModal({
+    title: 'Match Details',
+    bodyHTML: `
+      ${bannerHTML}
+      <h2 style="font-size:1.15rem;margin-bottom:8px">${esc(m.title || '')}</h2>
+      <div class="flex gap-2 mb-3"><span class="badge ${m.mode==='BR'?'br':m.mode==='CS'?'cs':'lw'}">${esc(modeName)}</span><span class="badge ${m.status}">${esc(m.status)}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Date</div><div style="font-weight:500">${esc(m.matchDate || '—')}</div></div>
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Time</div><div style="font-weight:500">${esc(formatTime12h(m.matchTime) || '—')}</div></div>
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Entry Fee</div><div style="font-weight:500">${m.entryFee > 0 ? fmtMoney(m.entryFee) : 'FREE'}</div></div>
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Per Kill</div><div style="font-weight:500">${fmtMoney(m.perKill || 0)}</div></div>
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Prize Pool</div><div style="font-weight:500">${fmtMoney(m.prizePool || 0)}</div></div>
+        <div><div style="font-size:.7rem;color:var(--txm);text-transform:uppercase;letter-spacing:.8px">Slots</div><div style="font-weight:500">${reg} / ${cap}</div></div>
+      </div>
+      <div class="slot-bar"><div class="slot-fill ${isFull?'full':''}" style="width:${pct}%"></div></div>
+      <div class="slot-meta"><span>${isFull ? 'FULL' : (cap-reg) + ' slots left'}</span><span>${pct.toFixed(0)}%</span></div>
+      ${myResultHTML}
+      ${m.description ? `<hr class="divider"><h4 style="font-size:.88rem">Description</h4><p style="font-size:.84rem">${esc(m.description)}</p>` : ''}
+      ${m.rules ? `<hr class="divider"><h4 style="font-size:.88rem">Rules</h4><p style="font-size:.84rem;white-space:pre-wrap">${esc(m.rules)}</p>` : ''}
+      ${roomHTML}
+    `,
+    footerHTML,
+    onMount: (el, close) => {
+      el.querySelectorAll('[data-copy]').forEach(b => { b.onclick = (e) => { e.stopPropagation(); navigator.clipboard?.writeText(b.dataset.copy).then(()=>toast('success','Copied','')).catch(()=>{}); }; });
+      const cb = el.querySelector('[data-x="close"]');
+      if (cb) cb.onclick = close;
+      const jb = el.querySelector('[data-x="join"]');
+      if (jb) jb.onclick = () => { close(); handleJoin(matchId); };
+    }
+  });
+}
+
+async function handleJoin(matchId) {
+  if (!State.user) return;
+  const m = State.tournaments.find(t => t.id === matchId);
+  if (!m) return;
+  const balance = Number(State.wallet.balance || 0);
+  const fee = Number(m.entryFee || 0);
+
+  if (fee > 0 && balance < fee) { toast('warning','Insufficient Balance', ''); openAddBalance(); return; }
+
+  const confirmed = await new Promise(resolve => {
+    openModal({
+      title: 'Confirm Join',
+      bodyHTML: `
+        <div style="text-align:center;margin-bottom:14px"><i class="fa-solid fa-trophy" style="font-size:2.5rem;color:var(--ac2)"></i></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="room-row"><span class="rk">Match</span><span style="font-weight:600">${esc(m.title||'')}</span></div>
+          <div class="room-row"><span class="rk">Entry Fee</span><span style="font-weight:600">${fee > 0 ? fmtMoney(fee) : 'FREE'}</span></div>
+          <div class="room-row"><span class="rk">Your Balance</span><span style="font-weight:600">${fmtMoney(balance)}</span></div>
+          <div class="room-row"><span class="rk">After Joining</span><span style="font-weight:600;color:var(--ok)">${fmtMoney(balance - fee)}</span></div>
+        </div>
+      `,
+      footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="ok"><i class="fa-solid fa-check"></i> Confirm & Join</button>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-x="c"]').onclick = () => { close(); resolve(false); };
+        el.querySelector('[data-x="ok"]').onclick = () => { close(); resolve(true); };
+      }
+    });
+  });
+
+  if (!confirmed) return;
+  await executeJoin(matchId, m, fee);
+}
+
+async function executeJoin(matchId, m, fee) {
+  const uid = State.user.uid;
+  const operationId = 'join_' + matchId + '_' + uid + '_' + Date.now();
+  const regRef = push(ref(db, 'registrations'));
+  const regId = regRef.key;
+
+  try {
+    const capResult = await runTransaction(ref(db, 'tournaments/' + matchId + '/registeredCount'), (cur) => {
+      const curr = Number(cur) || 0;
+      if (curr >= Number(m.capacity)) return;
+      return curr + 1;
+    });
+    if (!capResult.committed) { toast('error','Match Full',''); return; }
+
+    if (fee > 0) {
+      const wResult = await runTransaction(ref(db, 'wallets/' + uid + '/balance'), (cur) => {
+        const curr = Number(cur) || 0;
+        if (curr < fee) return;
+        return curr - fee;
+      });
+      if (!wResult.committed) {
+        await runTransaction(ref(db, 'tournaments/' + matchId + '/registeredCount'), (cur) => Math.max(0, (Number(cur)||0) - 1));
+        toast('error','Insufficient Balance',''); openAddBalance(); return;
+      }
+    }
+
+    await set(regRef, { id: regId, matchId, matchTitle: m.title || '', matchMode: m.mode || '', userId: uid, userName: State.profile?.displayName || 'Player', userFfUid: State.profile?.freeFireUid || '', entryFee: fee, status: 'confirmed', operationId, createdAt: Date.now() });
+
+    if (fee > 0) {
+      const txRef = push(ref(db, 'walletTransactions'));
+      await set(txRef, { id: txRef.key, userId: uid, type: 'entry_fee', amount: -fee, currency: 'INR', relatedId: matchId, relatedRegId: regId, status: 'completed', idempotencyKey: operationId, createdAt: Date.now() });
+    }
+
+    await set(ref(db, 'userRegistrations/' + uid + '/' + matchId), { regId, status: 'confirmed', matchTitle: m.title || '', createdAt: Date.now() });
+
+    const notifRef = push(ref(db, 'notifications/' + uid));
+    await set(notifRef, { id: notifRef.key, type: 'registration', title: 'Registration Confirmed', body: `You joined "${m.title}"`, matchId, read: false, createdAt: Date.now() });
+
+    toast('success','Joined!', fee > 0 ? `${fmtMoney(fee)} deducted.` : 'Entry confirmed.');
+    navigate('mymatches');
+  } catch (e) { toast('error','Join Failed', e.message || ''); }
+}
+
+function renderMyMatches() {
+  const host = $('#myMatchesList');
+  if (!host) return;
+  const list = (State.myRegistrations || []).filter(r => isWithinRetention(r.createdAt)).slice().sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+  if (!list.length) {
+    host.innerHTML = `<div class="empty-state"><div class="es-icon"><i class="fa-solid fa-list-check"></i></div><h3>No matches yet</h3><button class="btn btn-primary mt-3" data-nav="tournaments"><i class="fa-solid fa-trophy"></i> Browse Matches</button></div>`;
+    host.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => navigate(b.dataset.nav));
+    return;
+  }
+  const active = list.filter(r => { const m = State.tournaments.find(t => t.id === r.matchId); return m && (m.status === 'upcoming' || m.status === 'ongoing'); });
+  const past = list.filter(r => { const m = State.tournaments.find(t => t.id === r.matchId); return m && (m.status === 'completed' || m.status === 'cancelled'); });
+
+  let html = '';
+  if (active.length) html += `<h3 class="mb-3">Active</h3>` + active.map(r => myMatchHTML(r)).join('');
+  if (past.length) html += `<h3 class="mb-3 mt-4">History</h3>` + past.map(r => myMatchHTML(r)).join('');
+  host.innerHTML = html;
+  bindMatchCardClicks(host);
+}
+
+function myMatchHTML(r) {
+  const m = State.tournaments.find(t => t.id === r.matchId) || {};
+  const modeCls = { BR:'br', CS:'cs', LW:'lw' }[m.mode] || 'neutral';
+  
+  const res = State.matchResultsCache[r.matchId];
+  const myResult = res && res.entries ? res.entries[r.userId] : null;
+  
+  let resultHTML = '';
+  if (myResult && res.status === 'approved') {
+    let rankIcon = '';
+    if(Number(myResult.rank) === 1) rankIcon = '🥇';
+    else if(Number(myResult.rank) === 2) rankIcon = '🥈';
+    else if(Number(myResult.rank) === 3) rankIcon = '🥉';
+
+    resultHTML = `
+      <div class="match-reward-detail">
+        <span>${rankIcon} <b>Rank: ${myResult.rank || '-'}</b></span>
+        <span><i class="fa-solid fa-crosshairs"></i> ${myResult.kills || 0} kills</span>
+        <span class="reward-badge"><i class="fa-solid fa-coins"></i> +${fmtMoney(myResult.reward || 0)}</span>
+      </div>
+    `;
+  } else if (myResult && res.status === 'pending_approval') {
+    resultHTML = `<div class="match-reward-detail"><span class="muted" style="font-size:.75rem;color:var(--inf)"><i class="fa-solid fa-hourglass-half"></i> Result pending approval</span></div>`;
+  } else if (res && res.status === 'pending_approval' && !myResult) {
+    resultHTML = `<div class="match-reward-detail"><span class="muted" style="font-size:.75rem;color:var(--inf)"><i class="fa-solid fa-hourglass-half"></i> Results being prepared</span></div>`;
+  }
+
+  return `<div class="match-card" data-match-id="${esc(r.matchId)}">
+    <div class="match-body">
+      <div class="flex-between mb-2">
+        <span class="badge ${modeCls}">${esc(m.mode || r.matchMode || '')}</span>
+        <span class="badge ${m.status || 'unknown'}">${esc(m.status || 'unknown')}</span>
+      </div>
+      <div class="match-title">${esc(r.matchTitle || m.title || '')}</div>
+      <div class="match-meta">
+        <span><i class="fa-regular fa-calendar"></i> ${esc(formatMatchDateTime(m.matchDate, m.matchTime))}</span>
+        <span><i class="fa-solid fa-indian-rupee-sign"></i> ${r.entryFee > 0 ? fmtMoney(r.entryFee) : 'FREE'}</span>
+      </div>
+      ${resultHTML}
+    </div>
+  </div>`;
+}
+
+async function openAddBalance() {
+  const sSnap = await get(ref(db, 'appSettings/payment')).catch(()=>null);
+  const s = sSnap?.val() || {};
+  const upiId = s.upiId || '';
+  const qrUrl = s.qrUrl || '';
+  const instructions = s.instructions || 'Send the exact amount and enter the UTR / transaction reference below.';
+  const minDep = Number(s.minDeposit || 10);
+  const maxDep = Number(s.maxDeposit || 10000);
+
+  openModal({
+    title: 'Add Balance',
+    bodyHTML: `
+      <div class="alert info"><i class="fa-solid fa-circle-info"></i><span>Pay via UPI, then submit the reference. Admin will verify and credit your wallet.</span></div>
+      ${qrUrl ? `<div class="tc mb-3"><img src="${esc(qrUrl)}" style="max-width:200px;border-radius:12px;margin:0 auto" onerror="this.style.display='none'"></div>` : ''}
+      ${upiId ? `<div class="room-box mb-3"><div class="room-row"><span class="rk">UPI ID</span><span class="rv">${esc(upiId)} <button class="copy-btn" data-copy="${esc(upiId)}">Copy</button></span></div></div>` : ''}
+      <div style="font-size:.8rem;color:var(--txd);margin-bottom:14px;white-space:pre-wrap">${esc(instructions)}</div>
+      <div class="field"><label>Amount (₹) <span class="req">*</span></label><input type="number" id="depAmt" class="input" min="${minDep}" max="${maxDep}" step="1" placeholder="Min ₹${minDep}"></div>
+      <div class="field"><label>Your UPI ID <span class="req">*</span></label><input type="text" id="depUpi" class="input" placeholder="yourname@upi"></div>
+      <div class="field"><label>Transaction / UTR Reference <span class="req">*</span></label><input type="text" id="depRef" class="input" placeholder="12-digit UTR"></div>
+    `,
+    footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="ok"><i class="fa-solid fa-paper-plane"></i> Submit</button>`,
+    onMount: (el, close) => {
+      el.querySelectorAll('[data-copy]').forEach(b => b.onclick = (e) => { e.stopPropagation(); navigator.clipboard?.writeText(b.dataset.copy).then(()=>toast('success','Copied','')).catch(()=>{}); });
+      el.querySelector('[data-x="c"]').onclick = close;
+      el.querySelector('[data-x="ok"]').onclick = async () => {
+        const amtRupees = Number(el.querySelector('#depAmt').value);
+        const upi = el.querySelector('#depUpi').value.trim();
+        const refVal = el.querySelector('#depRef').value.trim();
+        if (!amtRupees || amtRupees < minDep) { toast('error','Invalid','Min amount is ₹' + minDep); return; }
+        if (amtRupees > maxDep) { toast('error','Too High','Max amount is ₹' + maxDep); return; }
+        if (!upi) { toast('error','Required','Enter your UPI ID'); return; }
+        if (!refVal) { toast('error','Required','Enter transaction reference'); return; }
+        try {
+          const dupSnap = await get(query(ref(db, 'depositRequests'), orderByChild('transactionRef'), equalTo(refVal))).catch(()=>null);
+          if (dupSnap && dupSnap.exists()) { toast('error','Duplicate','This reference is already used'); return; }
+          const dRef = push(ref(db, 'depositRequests'));
+          await set(dRef, { id: dRef.key, userId: State.user.uid, userName: State.profile?.displayName || '', amount: amtRupees, payerUpi: upi, transactionRef: refVal, status: 'pending', createdAt: Date.now() });
+          
+          const notifRef = push(ref(db, 'notifications/' + State.user.uid));
+          await set(notifRef, { id: notifRef.key, type: 'deposit_request', title: 'Deposit Submitted', body: `Your deposit of ₹${amtRupees} is pending admin approval.`, read: false, createdAt: Date.now() });
+
+          toast('success','Submitted','Pending verification');
+          close();
+        } catch (e) { toast('error','Failed',e.message); }
+      };
+    }
+  });
+}
+
+async function openWithdraw() {
+  const sSnap = await get(ref(db, 'appSettings/payment')).catch(()=>null);
+  const s = sSnap?.val() || {};
+  const minWd = Number(s.minWithdrawal || 100);
+  const balance = Number(State.wallet.balance || 0);
+
+  openModal({
+    title: 'Withdraw',
+    bodyHTML: `
+      <div class="alert info"><i class="fa-solid fa-circle-info"></i><span>Min withdrawal: <b>${fmtMoney(minWd)}</b></span></div>
+      <div class="room-box mb-3"><div class="room-row"><span class="rk">Available</span><span class="rv">${fmtMoney(balance)}</span></div></div>
+      <div class="field"><label>Amount (₹) <span class="req">*</span></label><input type="number" id="wdAmt" class="input" min="${minWd}" placeholder="Min ₹${minWd}"></div>
+      <div class="field"><label>Your UPI ID <span class="req">*</span></label><input type="text" id="wdDetail" class="input" placeholder="yourname@upi"></div>
+    `,
+    footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="ok"><i class="fa-solid fa-arrow-up"></i> Request</button>`,
+    onMount: (el, close) => {
+      el.querySelector('[data-x="c"]').onclick = close;
+      el.querySelector('[data-x="ok"]').onclick = async () => {
+        const amt = Number(el.querySelector('#wdAmt').value);
+        const detail = el.querySelector('#wdDetail').value.trim();
+        if (!amt || amt < minWd) { toast('error','Too Low','Min is ' + fmtMoney(minWd)); return; }
+        if (amt > balance) { toast('error','Insufficient','Not enough balance'); return; }
+        if (!detail) { toast('error','Required','Enter your UPI ID'); return; }
+        try {
+          const wResult = await runTransaction(ref(db, 'wallets/' + State.user.uid + '/balance'), (cur) => { const curr = Number(cur) || 0; if (curr < amt) return; return curr - amt; });
+          if (!wResult.committed) { toast('error','Failed','Could not process'); return; }
+          await runTransaction(ref(db, 'wallets/' + State.user.uid + '/reserved'), (cur) => (Number(cur)||0) + amt);
+          const wdRef = push(ref(db, 'withdrawalRequests'));
+          await set(wdRef, { id: wdRef.key, userId: State.user.uid, userName: State.profile?.displayName || '', amount: amt, payoutMethod: 'UPI', payoutDetail: detail, status: 'pending', createdAt: Date.now() });
+          
+          const txRef = push(ref(db, 'walletTransactions'));
+          await set(txRef, { id: txRef.key, userId: State.user.uid, type: 'withdrawal', amount: -amt, currency: 'INR', relatedId: wdRef.key, status: 'pending', createdAt: Date.now() });
+          
+          const notifRef = push(ref(db, 'notifications/' + State.user.uid));
+          await set(notifRef, { id: notifRef.key, type: 'withdrawal_request', title: 'Withdrawal Requested', body: `Your withdrawal of ₹${amt} is pending admin approval.`, read: false, createdAt: Date.now() });
+
+          toast('success','Requested','Admin will process soon');
+          close();
+        } catch (e) { toast('error','Failed',e.message); }
+      };
+    }
+  });
+}
+
+function renderTransactions() {
+  const host = $('#txList');
+  if (!host) return;
+  
+  const list = (State.transactions || [])
+    .filter(t => isWithinRetention(t.createdAt) && !State.localDeletedTxs.includes(t.id))
+    .slice(0, 50);
+    
+  if (!list.length) { host.innerHTML = `<div class="empty-state"><p>No transactions.</p></div>`; return; }
+  
+  host.innerHTML = list.map(t => {
+    const icon = { 
+      deposit:'fa-arrow-down', entry_fee:'fa-ticket', refund:'fa-rotate-left', referral:'fa-share-nodes', referral_bonus:'fa-gift', kill_reward:'fa-crosshairs', prize:'fa-medal', match_reward:'fa-trophy', spin_reward:'fa-dharmachakra', daily_bonus:'fa-gift', ad_reward:'fa-tv', withdrawal:'fa-arrow-up', withdrawal_refund:'fa-rotate-left', admin_set:'fa-pen-to-square', vip_purchase:'fa-crown', diamond_earn:'fa-gem', diamond_spend:'fa-gem', admin_diamond_gift:'fa-gift', admin_diamond_set:'fa-gem'
+    }[t.type] || 'fa-receipt';
+    
+    let cls = t.amount >= 0 ? 'pos' : 'neg';
+    let color = t.amount >= 0 ? 'var(--ok)' : 'var(--er)';
+    let bg = t.amount >= 0 ? 'var(--oks)' : 'var(--ers)';
+    
+    let richBody = '';
+    let title = (t.type || 'Transaction').replace(/_/g,' ').toUpperCase();
+    let displayAmount = '';
+    
+    const isDiamonds = t.currency === 'DIAMONDS' || ['spin_reward', 'daily_bonus', 'ad_reward', 'admin_diamond_gift', 'admin_diamond_set'].includes(t.type);
+    const displayVal = isDiamonds ? (t.diamonds || t.amount) : t.amount;
+    
+    if (isDiamonds) {
+       cls = displayVal >= 0 ? 'pos' : 'neg';
+       color = displayVal >= 0 ? 'var(--ok)' : 'var(--er)';
+       bg = displayVal >= 0 ? 'var(--oks)' : 'var(--ers)';
+       displayAmount = `${displayVal >= 0 ? '+' : ''}${displayVal} 💎`;
+    } else {
+       displayAmount = `${displayVal >= 0 ? '+' : ''}${fmtMoney(displayVal)}`;
+    }
+
+    if (t.type === 'match_reward' && t.matchTitle) {
+      title = `Match Reward — ${t.matchTitle}`;
+      let rankTxt = `Rank: ${t.rank || '-'}`;
+      if(Number(t.rank) === 1) rankTxt = '🥇 Rank: 1st';
+      else if(Number(t.rank) === 2) rankTxt = '🥈 Rank: 2nd';
+      else if(Number(t.rank) === 3) rankTxt = '🥉 Rank: 3rd';
+
+      richBody = `<div style="font-size:.75rem;color:var(--txd);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
+        <span>${rankTxt}</span>
+        <span>🎯 ${t.kills || 0} kills</span>
+      </div>`;
+    } else if (t.type === 'spin_reward') {
+      title = '🎡 Spin & Win Reward';
+    } else if (t.type === 'daily_bonus') {
+      title = '🎁 Daily Login Bonus';
+    } else if (t.type === 'ad_reward') {
+      title = '📺 Ad Watch Reward';
+    } else if (t.type === 'vip_purchase') {
+      title = '👑 VIP Purchase';
+      displayAmount = t.currency === 'DIAMONDS' ? `${displayVal > 0 ? '+' : ''}${displayVal} 💎` : `${displayVal >= 0 ? '+' : ''}${fmtMoney(displayVal)}`;
+    } else if (t.type === 'admin_diamond_gift') {
+      title = '🎁 Diamonds Gifted by Admin';
+    } else if (t.type === 'admin_diamond_set') {
+      title = displayVal > 0 ? '💎 Diamonds Added by Admin' : '💎 Diamonds Deducted by Admin';
+    }
+    
+    if(!richBody) {
+      richBody = `<small>${fmtDateTime(t.createdAt)} · ${esc(t.status||'')}</small>`;
+    }
+
+    return `<div class="list-item">
+      <div class="li-icon" style="background:${bg};color:${color}"><i class="fa-solid ${icon}"></i></div>
+      <div class="li-body">
+        <b>${esc(title)}</b>
+        ${richBody}
+      </div>
+      <span class="amount ${cls}" style="margin-right:8px;">${displayAmount}</span>
+      <button class="delete-tx-btn" onclick="deleteTx('${t.id}')"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+window.deleteTx = (id) => {
+  if(!State.localDeletedTxs.includes(id)) {
+    State.localDeletedTxs.push(id);
+    localStorage.setItem('deleted_txs', JSON.stringify(State.localDeletedTxs));
+    renderTransactions();
+    toast('success', 'Deleted', 'Transaction removed from your history');
+  }
+};
+
+// ==========================================
+// WORLD CHAT UI & LOGIC
+// ==========================================
+function openWorldChat() {
+  if (!isVipActive()) {
+    openModal({
+      title: 'Premium Required',
+      bodyHTML: `<div style="text-align:center;padding:20px 0;"><i class="fa-solid fa-lock" style="font-size:3rem;color:var(--wn);margin-bottom:12px;"></i><h3>VIP Only Feature</h3><p style="font-size:0.9rem;">World Chat and Direct Admin DM are available only for Premium users. Upgrade now to chat with all players and get a Blue Tick!</p></div>`,
+      footerHTML: `<button class="btn btn-primary w-100" id="vipFromChatBtn"><i class="fa-solid fa-crown"></i> Get Premium</button>`,
+      onMount: (el, close) => {
+        el.querySelector('#vipFromChatBtn').onclick = () => { close(); setTimeout(()=>openVipStore(), 200); };
+      }
+    });
+    return;
+  }
+
+  openModal({
+    title: '🌍 World Chat',
+    extraClass: 'chat-modal',
+    bodyHTML: `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--bd);">
+        <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:600; color:var(--ok);">
+          <i class="fa-solid fa-circle" style="font-size:0.5rem; animation: spPulse 2s infinite;"></i> World Chat Active
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="icon-btn" id="switchToDmBtn" style="width:32px;height:32px;font-size:0.9rem;color:var(--ac2);" title="Direct Admin DM">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+          <button class="icon-btn" id="clearMyChatBtn" style="width:32px;height:32px;font-size:0.9rem;color:var(--er);" title="Clear Chat">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+      <div id="chatMessages"></div>
+      <div class="chat-input-area" style="position:relative;">
+        <button class="emoji-btn-chat" id="chatEmojiBtn"><i class="fa-regular fa-face-smile"></i></button>
+        <input type="text" id="chatInput" class="input" placeholder="Type a message..." maxlength="100">
+        <button class="btn btn-primary" id="sendChatBtn"><i class="fa-solid fa-paper-plane"></i></button>
+        <div class="emoji-picker-popup" id="chatEmojiPicker"></div>
+      </div>
+    `,
+    onMount: (el, close) => {
+      renderChatMessages();
+      
+      const emojiBtn = el.querySelector('#chatEmojiBtn');
+      const emojiPicker = el.querySelector('#chatEmojiPicker');
+      const input = el.querySelector('#chatInput');
+
+      const emojis = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾','👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏'];
+      emojiPicker.innerHTML = emojis.map(e => `<span style="font-size:1.5rem;cursor:pointer;padding:4px;" onclick="document.getElementById('chatInput').value += '${e}'; document.getElementById('chatInput').focus(); document.getElementById('chatEmojiPicker').classList.remove('show');">${e}</span>`).join('');
+      
+      emojiBtn.onclick = (e) => { e.stopPropagation(); emojiPicker.classList.toggle('show'); };
+      document.addEventListener('click', (e) => { if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) emojiPicker.classList.remove('show'); });
+
+      const sendFn = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        
+        const msgRef = push(ref(db, 'worldChat'));
+        const newMsg = { id: msgRef.key, userId: State.user.uid, userName: State.profile.displayName, userVip: isVipActive(), text: text, createdAt: Date.now(), deleted: false };
+        
+        State.chatMessages.push(newMsg);
+        renderChatMessages();
+        
+        try { await set(msgRef, newMsg); } 
+        catch(e) { State.chatMessages = State.chatMessages.filter(m => m.id !== newMsg.id); renderChatMessages(); toast('error', 'Failed to send', ''); }
+      };
+
+      el.querySelector('#sendChatBtn').onclick = sendFn;
+      input.onkeydown = (e) => { if(e.key === 'Enter') sendFn(); };
+
+      el.querySelector('#clearMyChatBtn').onclick = async () => {
+        if(!await confirmDialog('Clear Chat', 'Clear all messages from your side?')) return;
+        State.localDeletedChats = State.chatMessages.map(m => m.id);
+        localStorage.setItem('deleted_chats', JSON.stringify(State.localDeletedChats));
+        renderChatMessages();
+        toast('info', 'Cleared', '');
+      };
+
+      el.querySelector('#switchToDmBtn').onclick = () => { close(); setTimeout(() => openAdminDM(), 200); };
+    }
+  });
+}
+
+function renderChatMessages() {
+  const host = $('#chatMessages');
+  if (!host) return;
+  const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
+  
+  const validMsgs = State.chatMessages.filter(m => m.createdAt > fiveDaysAgo && !State.localDeletedChats.includes(m.id));
+
+  host.innerHTML = validMsgs.map(m => {
+    const isMine = m.userId === State.user.uid;
+    return `<div class="chat-msg ${isMine ? 'mine' : ''}" data-id="${m.id}" data-text="${esc(m.text)}" data-mine="${isMine}">
+      <div class="chat-msg-header">
+        <span>${esc(m.userName)}</span>
+        ${m.userVip ? '<i class="fa-solid fa-circle-check blue-tick"></i>' : ''}
+      </div>
+      <div class="chat-msg-text">${esc(m.text)} ${m.isEdited ? '<span style="font-size:0.65rem;color:var(--txm);">(edited)</span>' : ''}</div>
+      <div class="chat-msg-time">${fmtTimeOnly(m.createdAt)}</div>
+    </div>`;
+  }).join('');
+  
+  host.querySelectorAll('.chat-msg.mine').forEach(msgEl => {
+    let pressTimer;
+    const startPress = (e) => {
+      e.preventDefault();
+      pressTimer = setTimeout(() => showMsgOptions(msgEl.dataset.id, msgEl.dataset.text, false), 600);
+    };
+    const cancelPress = () => clearTimeout(pressTimer);
+    msgEl.addEventListener('mousedown', startPress);
+    msgEl.addEventListener('touchstart', startPress);
+    msgEl.addEventListener('mouseup', cancelPress);
+    msgEl.addEventListener('mouseleave', cancelPress);
+    msgEl.addEventListener('touchend', cancelPress);
+  });
+  host.scrollTop = host.scrollHeight;
+}
+
+// ==========================================
+// DIRECT ADMIN DM
+// ==========================================
+async function openAdminDM() {
+  if (!isVipActive()) { toast('warning', 'VIP Only', 'Direct Admin DM requires Premium.'); return; }
+  const uid = State.user.uid;
+  const dmRef = ref(db, 'adminMessages/' + uid);
+  
+  openModal({
+    title: '💬 Direct Admin DM',
+    extraClass: 'dm-modal',
+    bodyHTML: `
+      <div class="alert info" style="margin-bottom:10px;"><i class="fa-solid fa-headset"></i><span>Message directly to admin. Replies appear here.</span></div>
+      <div id="dmMessages" style="height: 45vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:4px;"></div>
+    `,
+    footerHTML: `
+      <div class="chat-input-area" style="margin-top:0; width:100%; position:relative;">
+        <button class="emoji-btn-chat" id="dmEmojiBtn"><i class="fa-regular fa-face-smile"></i></button>
+        <input type="text" id="dmInput" class="input" placeholder="Type your message..." maxlength="300">
+        <button class="btn btn-primary" id="dmSendBtn"><i class="fa-solid fa-paper-plane"></i></button>
+        <div class="emoji-picker-popup" id="dmEmojiPicker"></div>
+      </div>
+    `,
+    onMount: (el, close) => {
+      const msgsHost = el.querySelector('#dmMessages');
+      const emojiBtn = el.querySelector('#dmEmojiBtn');
+      const emojiPicker = el.querySelector('#dmEmojiPicker');
+      const input = el.querySelector('#dmInput');
+
+      const emojis = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾','👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏'];
+      emojiPicker.innerHTML = emojis.map(e => `<span style="font-size:1.5rem;cursor:pointer;padding:4px;" onclick="document.getElementById('dmInput').value += '${e}'; document.getElementById('dmInput').focus(); document.getElementById('dmEmojiPicker').classList.remove('show');">${e}</span>`).join('');
+
+      emojiBtn.onclick = (e) => { e.stopPropagation(); emojiPicker.classList.toggle('show'); };
+      document.addEventListener('click', (e) => { if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) emojiPicker.classList.remove('show'); });
+
+      const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
+
+      const unsubscribe = onValue(dmRef, (snap) => {
+        let messages = [];
+        if (snap.exists()) {
+          const v = snap.val();
+          Object.keys(v).forEach(k => { if (isObj(v[k]) && !v[k].deleted && v[k].createdAt > fiveDaysAgo) messages.push({ id: k, ...v[k] }); });
+        }
+        messages.sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+        
+        msgsHost.innerHTML = messages.map(m => {
+          const fromMe = m.from === 'user';
+          return `<div class="chat-msg ${fromMe ? 'mine' : ''}" style="max-width:85%;" data-id="${m.id}" data-text="${esc(m.text)}" data-mine="${fromMe}">
+            <div class="chat-msg-header"><span>${fromMe ? 'You' : '🛡️ Admin'}</span></div>
+            <div class="chat-msg-text">${esc(m.text)} ${m.isEdited ? '<span style="font-size:0.65rem;color:var(--txm);">(edited)</span>' : ''}</div>
+            <div class="chat-msg-time">${fmtTimeOnly(m.createdAt)}</div>
+          </div>`;
+        }).join('');
+        
+        msgsHost.querySelectorAll('.chat-msg.mine').forEach(msgEl => {
+          let pressTimer;
+          const startPress = (e) => { e.preventDefault(); pressTimer = setTimeout(() => showMsgOptions(msgEl.dataset.id, msgEl.dataset.text, true), 600); };
+          const cancelPress = () => clearTimeout(pressTimer);
+          msgEl.addEventListener('mousedown', startPress);
+          msgEl.addEventListener('touchstart', startPress);
+          msgEl.addEventListener('mouseup', cancelPress);
+          msgEl.addEventListener('mouseleave', cancelPress);
+          msgEl.addEventListener('touchend', cancelPress);
+        });
+
+        msgsHost.scrollTop = msgsHost.scrollHeight;
+      });
+      
+      State.dmListener = unsubscribe;
+      
+      const sendFn = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        
+        const pushRef = push(dmRef);
+        const tempMsg = { id: pushRef.key, text, from: 'user', userId: uid, userName: State.profile.displayName, createdAt: Date.now() };
+        
+        try {
+          await set(pushRef, tempMsg);
+          const txRef = push(ref(db, 'notifications/' + uid));
+          await set(txRef, { id: txRef.key, type: 'admin_dm', title: 'Message sent to Admin', body: text, read: false, createdAt: Date.now() });
+        } catch(e) { toast('error', 'Failed', e.message); }
+      };
+      
+      el.querySelector('#dmSendBtn').onclick = sendFn;
+      input.onkeydown = (e) => { if(e.key === 'Enter') sendFn(); };
+    }
+  });
+}
+
+// ==========================================
+// MESSAGE EDIT/DELETE LOGIC
+// ==========================================
+window.currentEditingMsg = null;
+window.showMsgOptions = (id, text, isDm) => {
+  window.currentEditingMsg = { id, text, isDm };
+  const closeBtnId = 'closeMsgOpt_' + Date.now();
+  openModal({
+    title: 'Message Options',
+    bodyHTML: `
+       <div style="display:flex; flex-direction:column; gap:10px;">
+         <button class="btn btn-outline" style="justify-content:flex-start;" id="editMsgBtn"><i class="fa-solid fa-pen"></i> Edit Message</button>
+         <button class="btn btn-danger" style="justify-content:flex-start;" id="deleteMsgBtn"><i class="fa-solid fa-trash"></i> Delete for Everyone</button>
+       </div>
+    `,
+    footerHTML: `<button class="btn btn-ghost w-100" id="${closeBtnId}" data-x="c">Cancel</button>`,
+    onMount: (el, close) => { 
+       el.querySelector(`#${closeBtnId}`).onclick = close; 
+       el.querySelector('#editMsgBtn').onclick = () => { close(); setTimeout(() => window.editChatMsg(), 100); };
+       el.querySelector('#deleteMsgBtn').onclick = () => { close(); setTimeout(() => window.deleteChatMsg(), 100); };
+    }
+  });
+};
+
+window.editChatMsg = () => {
+  const { id, text, isDm } = window.currentEditingMsg;
+  if (!id) return;
+  openModal({
+    title: 'Edit Message',
+    bodyHTML: `<div class="field"><label>New Message</label><input type="text" id="editMsgInput" class="input" value="${esc(text)}" maxlength="100"></div>`,
+    footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="ok">Save</button>`,
+    onMount: (el, close) => {
+      el.querySelector('[data-x="c"]').onclick = close;
+      el.querySelector('[data-x="ok"]').onclick = async () => {
+        const newText = el.querySelector('#editMsgInput').value.trim();
+        if (!newText) return;
+        const path = isDm ? `adminMessages/${State.user.uid}/${id}` : `worldChat/${id}`;
+        await update(ref(db, path), { text: newText, isEdited: true });
+        if (!isDm) {
+           const msg = State.chatMessages.find(m => m.id === id);
+           if (msg) { msg.text = newText; msg.isEdited = true; renderChatMessages(); }
+        }
+        toast('success', 'Edited', 'Message updated');
+        close();
+      };
+    }
+  });
+};
+
+window.deleteChatMsg = async () => {
+  const { id, isDm } = window.currentEditingMsg;
+  if (!id) return;
+  if (!await confirmDialog('Delete Message', 'This will remove the message for everyone.', true)) return;
+  const path = isDm ? `adminMessages/${State.user.uid}/${id}` : `worldChat/${id}`;
+  await update(ref(db, path), { deleted: true });
+  toast('success', 'Deleted', 'Message removed.');
+};
+
+// ==========================================
+// NOTIFICATIONS & VIP
+// ==========================================
+function openNotifications() {
+  const list = (State.notifications || []).filter(n => isWithinRetention(n.createdAt));
+  const unread = list.filter(n => !n.read).length;
+
+  let bodyHTML;
+  if (!list.length) {
+    bodyHTML = `<div class="notif-empty"><i class="fa-regular fa-bell-slash"></i><h4>No notifications</h4><p>Updates about matches, rewards, and more will appear here.</p></div>`;
+  } else {
+    bodyHTML = `<div class="notif-list">` + list.map(notifItemHTML).join('') + `</div>`;
+  }
+
+  const headerTitle = `Notifications${unread ? ` <span class="notif-header-count">${unread} new</span>` : ''}`;
+
+  openModal({
+    title: headerTitle,
+    bodyHTML,
+    extraClass: 'notif-modal',
+    footerHTML: `
+      <div style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
+        ${list.length > 0 ? `<button class="btn btn-danger" style="flex:1;" id="clearAllNotifsBtn"><i class="fa-solid fa-trash"></i> Clear</button>` : ''}
+        ${unread > 0 ? `<button class="btn btn-success" style="flex:1;" id="markAllReadBtn"><i class="fa-solid fa-check-double"></i> Mark as Read</button>` : ''}
+        <button class="btn btn-primary" style="flex:1;" data-x="close">Close</button>
+      </div>
+    `,
+    onMount: (el, close) => {
+      const cb = el.querySelector('[data-x="close"]');
+      if (cb) cb.onclick = close;
+      
+      const clearBtn = el.querySelector('#clearAllNotifsBtn');
+      if (clearBtn) {
+        clearBtn.onclick = async () => {
+          if(!await confirmDialog('Clear All', 'Delete all notifications?', true)) return;
+          try {
+            await remove(ref(db, 'notifications/' + State.user.uid));
+            toast('success', 'Cleared', '');
+            close();
+          } catch(e) { toast('error', 'Failed', ''); }
+        };
+      }
+
+      const markBtn = el.querySelector('#markAllReadBtn');
+      if (markBtn) {
+        markBtn.onclick = async () => {
+          const updates = {};
+          list.filter(n => !n.read).forEach(n => { updates['notifications/' + State.user.uid + '/' + n.id + '/read'] = true; });
+          if (Object.keys(updates).length) await update(ref(db), updates);
+          toast('success', 'Marked as Read', '');
+          close();
+        };
+      }
+      
+      el.querySelectorAll('.notif-item').forEach(item => {
+        item.onclick = async () => {
+          const id = item.dataset.notifId;
+          const notif = list.find(n => n.id === id);
+          if (!id) return;
+          try { await update(ref(db, 'notifications/' + State.user.uid + '/' + id), { read: true }); } catch(e) {}
+          item.classList.remove('unread');
+          if (notif && notif.matchId) {
+            close();
+            setTimeout(() => openMatchDetails(notif.matchId), 300);
+          } else if (notif && notif.type === 'admin_dm') {
+            close();
+            setTimeout(() => openAdminDM(), 300);
+          }
+        };
+      });
+    }
+  });
+}
+
+function notifItemHTML(n) {
+  const meta = getNotifMeta(n.type, n.title);
+  const unread = !n.read;
+  return `<div class="notif-item ${unread ? 'unread' : ''}" data-notif-id="${esc(n.id||'')}">
+    <div class="notif-icon ${meta.cls}"><i class="fa-solid ${meta.icon}"></i></div>
+    <div class="notif-content">
+      <div class="notif-title">${esc(n.title || 'Notification')}</div>
+      <div class="notif-body">${esc(n.body || '')}</div>
+      <div class="notif-time"><i class="fa-regular fa-clock"></i> ${esc(fmtRelativeTime(n.createdAt))}</div>
+    </div>
+  </div>`;
+}
+
+function getNotifMeta(type, title) {
+  const t = String(type || '').toLowerCase();
+  const T = String(title || '').toLowerCase();
+  if (t.includes('match_result')) return { cls: 'reward', icon: 'fa-trophy' };
+  if (t.includes('registration') || T.includes('registration') || T.includes('joined')) return { cls: 'registration', icon: 'fa-trophy' };
+  if (t.includes('balance') || T.includes('balance') || t.includes('admin_set')) return { cls: 'balance', icon: 'fa-wallet' };
+  if (t.includes('deposit') || T.includes('deposit')) { if (T.includes('reject')) return { cls: 'reject', icon: 'fa-circle-xmark' }; return { cls: 'deposit', icon: 'fa-circle-check' }; }
+  if (t.includes('withdraw') || T.includes('withdraw')) { if (T.includes('reject')) return { cls: 'reject', icon: 'fa-circle-xmark' }; return { cls: 'withdraw', icon: 'fa-money-bill-transfer' }; }
+  if (t.includes('prize') || t.includes('reward') || T.includes('prize') || T.includes('reward') || T.includes('win') || t.includes('referral')) return { cls: 'reward', icon: 'fa-medal' };
+  if (t.includes('admin_dm') || T.includes('admin')) return { cls: 'info', icon: 'fa-comment-dots' };
+  if (t.includes('vip_gift') || T.includes('vip')) return { cls: 'reward', icon: 'fa-crown' };
+  if (T.includes('reject') || T.includes('cancel') || T.includes('fail')) return { cls: 'reject', icon: 'fa-circle-exclamation' };
+  return { cls: 'info', icon: 'fa-bell' };
+}
+
+function openVipStore() {
+  const vipActive = isVipActive();
+  const expiryTxt = vipActive ? fmtDate(State.profile.vipExpiry) : null;
+  const userDiamonds = Number(State.profile?.diamonds || 0);
+
+  let html = `
+    <div style="text-align:center; margin-bottom:16px;">
+      <i class="fa-solid fa-crown" style="font-size:3rem; color:#fbbf24; margin-bottom:8px;"></i>
+      <h2 style="margin:0; color:#fbbf24;">VIP & Premium Store</h2>
+      ${vipActive ? `<p style="color:var(--ok);font-size:0.8rem;margin-top:4px;"><i class="fa-solid fa-circle-check"></i> Active till ${expiryTxt}</p>` : ''}
+    </div>
+    <div class="admin-note">
+      <i class="fa-solid fa-gem"></i>
+      <span>You have <b>${userDiamonds.toLocaleString('en-IN')}</b> diamonds. Buy VIP with diamonds or rupees.</span>
+    </div>
+    <ul class="vip-feature-list">
+      <li><i class="fa-solid fa-check"></i> <b>Blue Tick</b> in Chat & Profile</li>
+      <li><i class="fa-solid fa-check"></i> <b>World Chat</b> Access (Globe Icon)</li>
+      <li><i class="fa-solid fa-check"></i> <b>Direct Message to Admin</b></li>
+      <li><i class="fa-solid fa-check"></i> Unlock All App Themes</li>
+      <li><i class="fa-solid fa-check"></i> Custom Image Upload (Profile)</li>
+    </ul>
+    <h4 style="font-size:0.9rem; margin-bottom:8px;">Select Plan</h4>
+  `;
+
+  const plans = State.vipSettings?.plans || {};
+  for (const [key, p] of Object.entries(plans)) {
+    const diamonds = Number(p.diamonds || p.coins || 0);
+    html += `
+      <div class="vip-plan-card" data-plan="${key}">
+        <div class="vpc-head">
+          <b>${p.days} Days Premium</b>
+          ${Number(p.days) >= 30 ? '<span class="vip-badge-premium">Best Value</span>' : ''}
+        </div>
+        <div class="vpc-prices">
+          <div class="vpc-price"><i class="fa-solid fa-gem" style="color:#67e8f9;"></i> <span>${diamonds.toLocaleString('en-IN')} diamonds</span></div>
+          <div class="vpc-price"><i class="fa-solid fa-indian-rupee-sign" style="color:var(--ok);"></i> <span>₹${p.rupees}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  openModal({
+    title: 'Premium Store',
+    bodyHTML: html,
+    footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="buy" disabled>Continue</button>`,
+    onMount: (el, close) => {
+      let selectedPlan = null;
+
+      el.querySelector('[data-x="c"]').onclick = close;
+
+      el.querySelectorAll('.vip-plan-card').forEach(card => {
+        card.onclick = () => {
+          el.querySelectorAll('.vip-plan-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedPlan = card.dataset.plan;
+          el.querySelector('[data-x="buy"]').disabled = false;
+        };
+      });
+
+      el.querySelector('[data-x="buy"]').onclick = () => {
+        if (!selectedPlan) return;
+        const p = State.vipSettings.plans[selectedPlan];
+        const diamondPrice = Number(p.diamonds || p.coins || 0);
+        
+        close();
+        setTimeout(() => openVipPaymentMethod(selectedPlan, p, diamondPrice), 150);
+      };
+    }
+  });
+}
+
+function openVipPaymentMethod(planKey, p, diamondPrice) {
+  const walletBal = Number(State.wallet.balance || 0);
+  const userDiamonds = Number(State.profile?.diamonds || 0);
+  const canRupees = walletBal >= Number(p.rupees || 0);
+  const canDiamonds = userDiamonds >= diamondPrice;
+
+  openModal({
+    title: 'Choose Payment Method',
+    bodyHTML: `
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--ac2);">${p.days} Days Premium</div>
+        <div style="font-size:0.78rem;color:var(--txm);margin-top:4px;">Choose how you want to pay</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+        <button class="btn btn-outline" id="payRupeesBtn" style="flex-direction:column; padding:16px; ${!canRupees?'opacity:0.5;':''}">
+          <i class="fa-solid fa-indian-rupee-sign" style="font-size:1.5rem; margin-bottom:8px; color:var(--ok);"></i>
+          <b>₹${p.rupees}</b>
+          <small style="font-size:0.7rem; margin-top:4px;">Pay with Rupees</small>
+          <small style="font-size:0.65rem;color:${canRupees?'var(--ok)':'var(--er)'};margin-top:2px;">Bal: ₹${walletBal.toFixed(2)}</small>
+        </button>
+        <button class="btn btn-outline" id="payDiamondsBtn" style="flex-direction:column; padding:16px; ${!canDiamonds?'opacity:0.5;':''}">
+          <i class="fa-solid fa-gem" style="font-size:1.5rem; margin-bottom:8px; color:#67e8f9;"></i>
+          <b>${diamondPrice.toLocaleString('en-IN')} 💎</b>
+          <small style="font-size:0.7rem; margin-top:4px;">Pay with Diamonds</small>
+          <small style="font-size:0.65rem;color:${canDiamonds?'var(--ok)':'var(--er)'};margin-top:2px;">Have: ${userDiamonds.toLocaleString('en-IN')}</small>
+        </button>
+      </div>
+      <p style="font-size:0.72rem; text-align:center; color:var(--txm); margin:0;">Diamonds can be earned from matches, spins, ads & bonuses.</p>
+    `,
+    footerHTML: `<button class="btn btn-ghost w-100" id="vipPayCancel">Cancel</button>`,
+    onMount: (el, close) => {
+      el.querySelector('#vipPayCancel').onclick = close;
+      el.querySelector('#payRupeesBtn').onclick = () => {
+        if (!canRupees) { toast('error','Insufficient Balance','Add money to your wallet.'); return; }
+        close();
+        setTimeout(() => payVip(planKey, 'rupees', p), 100);
+      };
+      el.querySelector('#payDiamondsBtn').onclick = () => {
+        if (!canDiamonds) { toast('error','Insufficient Diamonds','Earn more diamonds from matches & rewards.'); return; }
+        close();
+        setTimeout(() => payVip(planKey, 'diamonds', p), 100);
+      };
+    }
+  });
+}
+
+window.payVip = async (planKey, method, p) => {
+  const diamondPrice = Number(p.diamonds || p.coins || 0);
+
+  try {
+    if (method === 'rupees') {
+      const bal = Number(State.wallet.balance || 0);
+      if (bal < p.rupees) { toast('error', 'Insufficient Balance', 'Add money to your wallet.'); return; }
+      
+      const res = await runTransaction(ref(db, 'wallets/' + State.user.uid + '/balance'), (cur) => {
+        const c = Number(cur) || 0;
+        if (c < p.rupees) return; // Abort
+        return c - p.rupees;
+      });
+      if (!res.committed) return toast('error', 'Failed', '');
+      
+    } else {
+      const diamonds = Number(State.profile.diamonds || 0);
+      if (diamonds < diamondPrice) { toast('error', 'Insufficient Diamonds', 'You don\'t have enough diamonds.'); return; }
+      
+      const res = await runTransaction(ref(db, 'users/' + State.user.uid + '/diamonds'), (cur) => {
+        const c = Number(cur) || 0;
+        if (c < diamondPrice) return; // Abort
+        return c - diamondPrice;
+      });
+      if (!res.committed) return toast('error', 'Failed', '');
+    }
+
+    const currentExpiry = Number(State.profile.vipExpiry || 0);
+    const newExpiry = Math.max(Date.now(), currentExpiry) + (p.days * 24 * 60 * 60 * 1000);
+    
+    await update(ref(db, 'users/' + State.user.uid), { vipExpiry: newExpiry });
+
+    const txRef = push(ref(db, 'walletTransactions'));
+    await set(txRef, {
+      id: txRef.key,
+      userId: State.user.uid,
+      type: 'vip_purchase',
+      amount: method === 'rupees' ? -p.rupees : 0,
+      currency: method === 'rupees' ? 'INR' : 'DIAMONDS',
+      diamonds: method === 'diamonds' ? -diamondPrice : 0,
+      status: 'completed',
+      createdAt: Date.now()
+    });
+    
+    triggerVipCelebration(p.days);
+    
+  } catch(e) {
+    toast('error', 'Failed', 'Could not complete transaction.');
+  }
+};
+
+function triggerVipCelebration(days) {
+  playNotifSound();
+  if (navigator.vibrate) { try { navigator.vibrate([200, 100, 200, 100, 500]); } catch(e) {} }
+  
+  if (typeof confetti === 'function') {
+    var duration = 3 * 1000;
+    var animationEnd = Date.now() + duration;
+    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10000 };
+    function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+    var interval = setInterval(function() {
+      var timeLeft = animationEnd - Date.now();
+      if (timeLeft <= 0) { return clearInterval(interval); }
+      var particleCount = 50 * (timeLeft / duration);
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+    }, 250);
+  }
+
+  openModal({
+    title: '',
+    bodyHTML: `
+      <div style="text-align:center; padding:30px 10px;">
+        <div style="font-size:5rem; animation:popIn .6s cubic-bezier(0.175, 0.885, 0.32, 1.275); line-height:1; margin-bottom:20px;">👑</div>
+        <h1 style="font-size:1.8rem; background:linear-gradient(135deg,#fbbf24,#f59e0b); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px;">Welcome to VIP!</h1>
+        <p style="font-size:1rem; color:var(--tx); font-weight:500;">You have successfully activated <b>${days} Days Premium</b>.</p>
+        <div style="display:flex; justify-content:center; gap:15px; margin-top:20px; flex-wrap:wrap;">
+          <span class="badge" style="background:#00a3ff;color:#fff;padding:6px 12px;font-size:0.8rem;"><i class="fa-solid fa-circle-check"></i> Blue Tick</span>
+          <span class="badge" style="background:#8b5cf6;color:#fff;padding:6px 12px;font-size:0.8rem;"><i class="fa-solid fa-globe"></i> World Chat</span>
+          <span class="badge" style="background:#fbbf24;color:#000;padding:6px 12px;font-size:0.8rem;"><i class="fa-solid fa-crown"></i> All Themes</span>
+        </div>
+      </div>
+    `,
+    footerHTML: `<button class="btn btn-primary w-100" style="background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#000; font-weight:700;" data-x="close">Let's Go!</button>`,
+    onMount: (el, close) => {
+      el.querySelector('[data-x="close"]').onclick = close;
+    }
+  });
+}
+
+function renderThemeGrid() {
+  const host = $('#themeGrid');
+  if (!host) return;
+  const isLocked = themeState.mode === 'global';
+  const current = computeActiveTheme();
+  const vip = isVipActive();
+
+  if (isLocked) {
+    host.innerHTML = `<div class="alert info"><i class="fa-solid fa-lock"></i><span>Theme is managed by admin.</span></div>`;
+    return;
+  }
+
+  const available = THEME_DEFS.filter(t => themeState.enabled[t.id] !== false);
+  host.innerHTML = available.map(t => {
+    const isVipOnly = t.id !== 'amoled';
+    const locked = isVipOnly && !vip;
+    
+    return `
+    <div class="theme-swatch ${t.id===current?'active':''} ${locked?'locked':''}" data-theme-pick="${t.id}" style="${locked?'opacity:0.6;':''}">
+      <div class="ts-dots">${t.dots.map(c => `<span style="background:${c}"></span>`).join('')}</div>
+      <small>${esc(t.name)}</small>
+      ${locked ? '<i class="fa-solid fa-lock" style="position:absolute; top:8px; right:8px; color:var(--wn);"></i>' : ''}
+    </div>
+  `}).join('');
+
+  host.querySelectorAll('[data-theme-pick]').forEach(el => {
+    el.onclick = async () => {
+      const picked = el.dataset.themePick;
+      const isVipOnly = picked !== 'amoled';
+      
+      if (isVipOnly && !isVipActive()) {
+        toast('warning', 'VIP Feature', 'Buy Premium to unlock themes.');
+        openVipStore();
+        return;
+      }
+
+      try {
+        await set(ref(db, 'users/' + State.user.uid + '/theme'), picked);
+        themeState.userTheme = picked;
+        applyTheme(picked);
+        renderThemeGrid();
+        toast('success','Theme applied','');
+      } catch (e) {
+        toast('error','Cannot save','');
+      }
+    };
+  });
+}
+
+function loadProfileExtras() {
+  renderReferralStats();
+}
+
+async function shareReferral() {
+  const code = State.profile?.referralCode || 'PUNJAB';
+  const rs = State.referralSettings || {};
+
+  let downloadLink = rs.downloadLink || 'https://punjabesports.app/download';
+  let signupBonus = rs.signupBonus || '₹2';
+  let referralBonus = rs.referralBonus || '₹2';
+  let template = rs.customMessage || DEFAULT_REFERRAL_MSG;
+
+  let shareText = template
+    .replace(/\{code\}/g, code)
+    .replace(/\{downloadLink\}/g, downloadLink)
+    .replace(/\{signupBonus\}/g, signupBonus)
+    .replace(/\{referralBonus\}/g, referralBonus);
+
+  openShareSheet(shareText, downloadLink);
+}
+
+function openShareSheet(text, link) {
+  const encText = encodeURIComponent(text);
+  const encLink = encodeURIComponent(link);
+  const shortLink = link.startsWith('http') ? link : 'https://' + link;
+
+  openModal({
+    title: 'Share Punjab Esports',
+    bodyHTML: `
+      <div class="alert info" style="margin-bottom:12px;padding:10px;"><i class="fa-solid fa-share-nodes"></i><span>Share with friends and earn rewards</span></div>
+      <div class="share-grid">
+        <a class="share-btn whatsapp" href="https://wa.me/?text=${encText}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>
+        <a class="share-btn telegram" href="https://t.me/share/url?url=${encLink}&text=${encText}" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i><span>Telegram</span></a>
+        <a class="share-btn instagram" href="https://www.instagram.com/" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i><span>Instagram</span></a>
+        <a class="share-btn sms" href="sms:?body=${encText}"><i class="fa-solid fa-comment-sms"></i><span>SMS</span></a>
+      </div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--txm);margin-bottom:6px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-eye"></i> Preview Message</div>
+      <div class="share-preview">${esc(text)}</div>
+      <button class="btn btn-primary btn-block" id="copyFullText" style="margin-bottom:8px;"><i class="fa-solid fa-copy"></i> Copy Full Message</button>
+      <button class="btn btn-outline btn-block" id="copyLinkOnly"><i class="fa-solid fa-link"></i> Copy Link Only</button>
+    `,
+    footerHTML: `<button class="btn btn-ghost w-100" data-x="close">Close</button>`,
+    onMount: (el, close) => {
+      el.querySelector('[data-x="close"]').onclick = close;
+      el.querySelector('#copyFullText').onclick = () => { navigator.clipboard?.writeText(text).then(() => toast('success','Message copied','')).catch(()=>toast('error','Copy failed','')); };
+      el.querySelector('#copyLinkOnly').onclick = () => { navigator.clipboard?.writeText(shortLink).then(() => toast('success','Link copied','')).catch(()=>toast('error','Copy failed','')); };
+    }
+  });
+}
+
+function openEditProfile() {
+  const p = State.profile || {};
+  const isVip = isVipActive();
+  
+  const emojis = ['😀','😎','🔥','💀','🥶','🤡','👽','🤖','💩','👻','👾','🎮','🕹️','🏆','🥇','🎯','💎','👑','⚡','🌟','🦁','🐯','🐉','🦅','🦊','🐺','🦈','🐼','🐨','🐸','🦄','🍕','🍔','🍟','🥤','🍺','🚀','🛸','✈️','🏎️','🏍️','🎸','🎧','🎤','💣','🔫','🛡️','⚔️','🗡️','🏹','💪','✌️','🤘','🤙','👊','🎲','🃏','🔮','💯','💸','💰','🤑'];
+
+  function getEmojiGridHTML() {
+    return `<div class="emoji-grid" style="display:grid; margin-top:10px;">
+      ${emojis.map(e => `<div class="emoji-btn" onclick="selectEmoji('${e}')">${e}</div>`).join('')}
+    </div>`;
+  }
+
+  openModal({
+    title: 'Edit Profile',
+    bodyHTML: `
+      <div class="field"><label>Free Fire Username</label><input type="text" id="epName" class="input" value="${esc(p.displayName||'')}" maxlength="40"></div>
+      <div class="field"><label>Free Fire UID</label><input type="text" id="epFfUid" class="input" value="${esc(p.freeFireUid||'')}" maxlength="20"></div>
+      
+      <div class="field">
+        <label>Profile Image</label>
+        ${isVip ? 
+          `<div style="display:flex; gap:10px; align-items:center;">
+             <input type="file" id="epPhotoFile" accept="image/*" class="input" style="padding:8px; font-size:0.8rem;">
+             <button class="btn btn-outline btn-sm" onclick="document.getElementById('emojiPicker').style.display = document.getElementById('emojiPicker').style.display === 'none' ? 'block' : 'none'"><i class="fa-solid fa-face-smile"></i> Emoji</button>
+           </div>
+           <div style="font-size:0.7rem; color:var(--txm); margin-top:4px;">* Upload a square image or select an emoji.</div>`
+          : 
+          `<div style="display:flex; gap:10px; align-items:center;">
+             <button class="btn btn-outline btn-sm" style="flex:1;" onclick="document.getElementById('emojiPicker').style.display = document.getElementById('emojiPicker').style.display === 'none' ? 'block' : 'none'"><i class="fa-solid fa-face-smile"></i> Choose Emoji</button>
+           </div>
+           <div style="font-size:0.75rem; color:var(--er); margin-top:8px;">* Image upload requires VIP. Choose an emoji for free!</div>`
+        }
+      </div>
+      
+      <div id="emojiPicker" style="display:none; margin-bottom:14px;">
+         ${getEmojiGridHTML()}
+      </div>
+
+      <input type="hidden" id="epEmoji" value="${esc(p.profileEmoji||'')}">
+    `,
+    footerHTML: `<button class="btn btn-ghost" data-x="c">Cancel</button><button class="btn btn-primary" data-x="ok"><i class="fa-solid fa-floppy-disk"></i> Save</button>`,
+    onMount: (el, close) => {
+      el.querySelector('[data-x="c"]').onclick = close;
+      
+      let base64Image = null;
+      const fileInput = el.querySelector('#epPhotoFile');
+      if (fileInput) {
+        fileInput.onchange = (ev) => {
+          const file = ev.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            base64Image = e.target.result;
+            if (base64Image.length > 500 * 1024) { 
+              toast('error', 'Too Large', 'Image must be under 500KB. Please compress it.');
+              base64Image = null;
+              fileInput.value = '';
+            } else {
+              toast('success', 'Image Selected', 'Ready to save.');
+            }
+          };
+          reader.readAsDataURL(file);
+        };
+      }
+
+      window.selectEmoji = (emoji) => {
+        el.querySelector('#epEmoji').value = emoji;
+        if(fileInput) fileInput.value = '';
+        base64Image = null;
+        toast('success', 'Emoji Selected', emoji);
+        el.querySelector('#emojiPicker').style.display = 'none';
+      };
+
+      el.querySelector('[data-x="ok"]').onclick = async () => {
+        const name = el.querySelector('#epName').value.trim();
+        const ff = el.querySelector('#epFfUid').value.trim();
+        const chosenEmoji = el.querySelector('#epEmoji').value;
+        
+        if (name.length < 2) { toast('error','Invalid Name',''); return; }
+        if (ff && !/^\d{6,15}$/.test(ff)) { toast('error','Invalid FF UID',''); return; }
+        
+        let finalPhotoUrl = p.photoUrl || '';
+        let finalEmoji = chosenEmoji || '';
+
+        if (base64Image) {
+           if (!isVip) { toast('error','VIP Only','Upgrade to add profile photo.'); return; }
+           finalPhotoUrl = base64Image;
+           finalEmoji = '';
+        } else if (finalEmoji) {
+           finalPhotoUrl = '';
+        } else if (p.photoUrl) {
+           finalPhotoUrl = p.photoUrl;
+        }
+
+        try {
+          await update(ref(db, 'users/' + State.user.uid), { 
+            displayName: name, 
+            freeFireUid: ff, 
+            photoUrl: finalPhotoUrl,
+            profileEmoji: finalEmoji,
+            updatedAt: Date.now() 
+          });
+          await update(ref(db, 'publicProfiles/' + State.user.uid), { displayName: name, freeFireUid: ff, photoUrl: finalPhotoUrl });
+          
+          State.profile = { ...State.profile, displayName: name, freeFireUid: ff, photoUrl: finalPhotoUrl, profileEmoji: finalEmoji };
+          loadProfileUI(); updateGreeting();
+          toast('success','Saved','Profile updated.');
+          close();
+        } catch (e) { toast('error','Failed',e.message); }
+      };
+    }
+  });
+}
+
+function openRules() {
+  openModal({
+    title: 'Terms & Fair Play Policy',
+    bodyHTML: `<h4>1. Fair Play</h4><p>No hacking, cheating, teaming, or unauthorized tools.</p><h4>2. Entry & Rewards</h4><p>Entry fees deducted on confirmed registration. Rewards credited after admin verification.</p><h4>3. Refunds</h4><p>Cancelled matches refunded per admin policy.</p><h4>4. Withdrawals</h4><p>Minimum withdrawal set by admin. Manual UPI payout.</p><h4>5. VIP & Premium</h4><p>VIP features are time-bound. Once expired, access to themes, chat, blue tick, and Direct Admin DM will be revoked automatically. Diamonds are non-refundable once spent.</p><h4>6. Account</h4><p>You are responsible for your account credentials.</p>`,
+    footerHTML: `<button class="btn btn-primary w-100" data-x="close">Close</button>`,
+    onMount: (el, close) => { el.querySelector('[data-x="close"]').onclick = close; }
+  });
+}
+
+// Spin Wheel functions remain but are neutralized by the HTML change
+function initSpinWheel() {
+  // Feature is currently locked and hidden in the HTML
+  return;
+}
+
+window.PE = { State, toast, openModal, confirmDialog, playNotifSound, openVipStore, openAdminDM };
+console.log('%cPunjab Esports v2.3.2 — Diamonds Section Locked', 'color:#8b5cf6;font-weight:bold;font-size:14px');
+</script>
+</body>
+</html>

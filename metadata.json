@@ -1,0 +1,6 @@
+{
+  "name": "Punjab Esports",
+  "description": "Punjab Esports tournament platform featuring dynamic status bar and navigation bar system UI theme integration for Android WebViews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
