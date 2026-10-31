@@ -1416,7 +1416,12 @@ function navigate(page) {
   if (el) el.classList.add('active');
   $$('.bn-item').forEach(b => b.classList.toggle('active', b.dataset.nav === page));
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (page === 'profile') { loadProfileExtras(); renderThemeGrid(); loadChannels(); renderReferralStats(); }
+  if (page === 'profile') {
+    if (window.Android && typeof window.Android.requestGalleryPermission === 'function') {
+      try { window.Android.requestGalleryPermission(); } catch(e) {}
+    }
+    loadProfileExtras(); renderThemeGrid(); loadChannels(); renderReferralStats();
+  }
 }
 
 $$('.bn-item').forEach(b => b.onclick = () => navigate(b.dataset.nav));
@@ -2666,6 +2671,9 @@ function openShareSheet(text, link) {
 }
 
 function openEditProfile() {
+  if (window.Android && typeof window.Android.requestGalleryPermission === 'function') {
+    try { window.Android.requestGalleryPermission(); } catch(e) {}
+  }
   const p = State.profile || {};
   const isVip = isVipActive();
   
@@ -2685,18 +2693,31 @@ function openEditProfile() {
       
       <div class="field">
         <label>Profile Image</label>
-        ${isVip ? 
-          `<div style="display:flex; gap:10px; align-items:center;">
-             <input type="file" id="epPhotoFile" accept="image/*" class="input" style="padding:8px; font-size:0.8rem;">
-             <button class="btn btn-outline btn-sm" onclick="document.getElementById('emojiPicker').style.display = document.getElementById('emojiPicker').style.display === 'none' ? 'block' : 'none'"><i class="fa-solid fa-face-smile"></i> Emoji</button>
-           </div>
-           <div style="font-size:0.7rem; color:var(--txm); margin-top:4px;">* Upload a square image or select an emoji.</div>`
-          : 
-          `<div style="display:flex; gap:10px; align-items:center;">
-             <button class="btn btn-outline btn-sm" style="flex:1;" onclick="document.getElementById('emojiPicker').style.display = document.getElementById('emojiPicker').style.display === 'none' ? 'block' : 'none'"><i class="fa-solid fa-face-smile"></i> Choose Emoji</button>
-           </div>
-           <div style="font-size:0.75rem; color:var(--er); margin-top:8px;">* Image upload requires VIP. Choose an emoji for free!</div>`
-        }
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="file" id="epPhotoFile" accept="image/*" style="display:none;">
+            <button type="button" class="btn btn-primary btn-sm" id="btnUploadImageTrigger" style="display:inline-flex; align-items:center; gap:6px;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> <span id="uploadBtnText">Upload image</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" id="btnEmojiToggle">
+              <i class="fa-solid fa-face-smile"></i> Choose Emoji
+            </button>
+          </div>
+          
+          <div id="fileSelectedDisplay" style="display:none; align-items:center; gap:10px; background:var(--sf2); border:1px solid var(--ok); border-radius:var(--rm); padding:8px 12px;">
+            <img id="filePreviewThumb" src="" style="width:40px; height:40px; border-radius:8px; object-fit:cover; display:none; border:1px solid var(--bd);">
+            <div style="flex:1; min-width:0;">
+              <div style="color:var(--ok); font-weight:600; display:flex; align-items:center; gap:5px; font-size:0.82rem;">
+                <i class="fa-solid fa-circle-check"></i> <span id="fileSelectedName">Photo selected</span>
+              </div>
+              <div style="font-size:0.72rem; color:var(--txm);" id="fileSelectedSize">Ready to save as profile photo</div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnRemoveSelectedFile" style="padding:4px 8px; font-size:0.75rem; color:var(--er);" title="Remove">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div style="font-size:0.7rem; color:var(--txm);">* Upload a photo from your gallery or choose an emoji.</div>
+        </div>
       </div>
       
       <div id="emojiPicker" style="display:none; margin-bottom:14px;">
@@ -2711,9 +2732,34 @@ function openEditProfile() {
       
       let base64Image = null;
       const fileInput = el.querySelector('#epPhotoFile');
+      const uploadBtn = el.querySelector('#btnUploadImageTrigger');
+      const uploadBtnText = el.querySelector('#uploadBtnText');
+      const selectedDisplay = el.querySelector('#fileSelectedDisplay');
+      const selectedName = el.querySelector('#fileSelectedName');
+      const selectedSize = el.querySelector('#fileSelectedSize');
+      const previewThumb = el.querySelector('#filePreviewThumb');
+      const removeBtn = el.querySelector('#btnRemoveSelectedFile');
+      const emojiToggle = el.querySelector('#btnEmojiToggle');
+      const emojiPicker = el.querySelector('#emojiPicker');
+
+      if (uploadBtn && fileInput) {
+        uploadBtn.onclick = () => {
+          if (window.Android && typeof window.Android.requestGalleryPermission === 'function') {
+            try { window.Android.requestGalleryPermission(); } catch(e) {}
+          }
+          fileInput.click();
+        };
+      }
+
+      if (emojiToggle && emojiPicker) {
+        emojiToggle.onclick = () => {
+          emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+        };
+      }
+
       if (fileInput) {
         fileInput.onchange = (ev) => {
-          const file = ev.target.files[0];
+          const file = ev.target.files && ev.target.files[0];
           if (!file) return;
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -2722,18 +2768,45 @@ function openEditProfile() {
               toast('error', 'Too Large', 'Image must be under 500KB. Please compress it.');
               base64Image = null;
               fileInput.value = '';
+              if (selectedDisplay) selectedDisplay.style.display = 'none';
+              if (uploadBtnText) uploadBtnText.textContent = 'Upload image';
             } else {
-              toast('success', 'Image Selected', 'Ready to save.');
+              toast('success', 'File Selected', file.name);
+              if (selectedName) selectedName.textContent = file.name;
+              if (selectedSize) {
+                const kb = Math.round(file.size / 1024);
+                selectedSize.textContent = `${kb} KB · File selected & ready to save`;
+              }
+              if (previewThumb) {
+                previewThumb.src = base64Image;
+                previewThumb.style.display = 'block';
+              }
+              if (selectedDisplay) selectedDisplay.style.display = 'flex';
+              if (uploadBtnText) uploadBtnText.textContent = 'Upload image (Change)';
+              if (emojiPicker) emojiPicker.style.display = 'none';
+              el.querySelector('#epEmoji').value = '';
             }
           };
           reader.readAsDataURL(file);
         };
       }
 
+      if (removeBtn) {
+        removeBtn.onclick = () => {
+          if (fileInput) fileInput.value = '';
+          base64Image = null;
+          if (selectedDisplay) selectedDisplay.style.display = 'none';
+          if (uploadBtnText) uploadBtnText.textContent = 'Upload image';
+          toast('info', 'Removed', 'Image selection cleared');
+        };
+      }
+
       window.selectEmoji = (emoji) => {
         el.querySelector('#epEmoji').value = emoji;
-        if(fileInput) fileInput.value = '';
+        if (fileInput) fileInput.value = '';
         base64Image = null;
+        if (selectedDisplay) selectedDisplay.style.display = 'none';
+        if (uploadBtnText) uploadBtnText.textContent = 'Upload image';
         toast('success', 'Emoji Selected', emoji);
         el.querySelector('#emojiPicker').style.display = 'none';
       };
@@ -2750,7 +2823,6 @@ function openEditProfile() {
         let finalEmoji = chosenEmoji || '';
 
         if (base64Image) {
-           if (!isVip) { toast('error','VIP Only','Upgrade to add profile photo.'); return; }
            finalPhotoUrl = base64Image;
            finalEmoji = '';
         } else if (finalEmoji) {

@@ -1,14 +1,18 @@
 package com.example
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -18,6 +22,7 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,12 +30,47 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
   private var webViewInstance: WebView? = null
+  private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+  private val galleryPermissionLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { isGranted ->
+    Log.d("MainActivity", "Gallery permission result: isGranted=$isGranted")
+  }
+
+  private val fileChooserLauncher = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+  ) { result ->
+    val data = result.data
+    val resultUris: Array<Uri>? = when {
+      result.resultCode == RESULT_OK && data?.data != null -> arrayOf(data.data!!)
+      result.resultCode == RESULT_OK && data?.clipData != null -> {
+        val count = data.clipData!!.itemCount
+        Array(count) { i -> data.clipData!!.getItemAt(i).uri }
+      }
+      else -> null
+    }
+    filePathCallback?.onReceiveValue(resultUris)
+    filePathCallback = null
+  }
+
+  fun checkAndRequestGalleryPermission() {
+    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+      Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+      galleryPermissionLauncher.launch(permission)
+    }
+  }
 
   inner class WebAppInterface {
     @JavascriptInterface
@@ -51,6 +91,13 @@ class MainActivity : ComponentActivity() {
     @JavascriptInterface
     fun setNavigationBarColor(colorHex: String, isDark: Boolean) {
       applySystemBars(colorHex, isDark)
+    }
+
+    @JavascriptInterface
+    fun requestGalleryPermission() {
+      runOnUiThread {
+        checkAndRequestGalleryPermission()
+      }
     }
 
     @JavascriptInterface
@@ -112,6 +159,9 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     cleanVariationsSeed()
 
+    // Request gallery permissions upon app launch
+    checkAndRequestGalleryPermission()
+
     // Initial state: default to dark system bars matching default amoled/dark theme
     window.statusBarColor = Color.BLACK
     window.navigationBarColor = Color.BLACK
@@ -157,7 +207,7 @@ class MainActivity : ComponentActivity() {
               mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
               cacheMode = WebSettings.LOAD_DEFAULT
               mediaPlaybackRequiresUserGesture = false
-              if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = false
               }
             }
@@ -171,6 +221,32 @@ class MainActivity : ComponentActivity() {
               override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                 Log.d("WebViewConsole", "${consoleMessage?.message()} [line ${consoleMessage?.lineNumber()}]")
                 return true
+              }
+
+              override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+              ): Boolean {
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+                return try {
+                  checkAndRequestGalleryPermission()
+                  val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "image/*"
+                  }
+                  if (intent.type.isNullOrEmpty() || intent.type == "*/*") {
+                    intent.type = "image/*"
+                  }
+                  fileChooserLauncher.launch(Intent.createChooser(intent, "Upload image"))
+                  true
+                } catch (e: Exception) {
+                  Log.e("MainActivity", "Failed to launch file chooser", e)
+                  this@MainActivity.filePathCallback?.onReceiveValue(null)
+                  this@MainActivity.filePathCallback = null
+                  false
+                }
               }
             }
 
@@ -241,6 +317,8 @@ class MainActivity : ComponentActivity() {
   }
 
   override fun onDestroy() {
+    filePathCallback?.onReceiveValue(null)
+    filePathCallback = null
     webViewInstance?.destroy()
     webViewInstance = null
     super.onDestroy()
