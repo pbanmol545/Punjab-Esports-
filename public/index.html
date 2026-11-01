@@ -782,6 +782,51 @@ function toast(type, title, msg, timeout=4000) {
   setTimeout(close, timeout);
 }
 
+function openExternalUrl(url) {
+  if (!url) return;
+  if (window.AndroidInterface && typeof window.AndroidInterface.openExternal === 'function') {
+    try {
+      window.AndroidInterface.openExternal(url);
+      return;
+    } catch(e) {}
+  }
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch(e) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch(e) {}
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '-9999px';
+    ta.setAttribute('readonly', '');
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) return true;
+  } catch(e) {}
+  return false;
+}
+
 function openModal({ title, bodyHTML, footerHTML, onMount=null, extraClass='' }) {
   const wrap = document.createElement('div');
   wrap.className = 'mb ' + extraClass;
@@ -1193,13 +1238,38 @@ async function loadChannels() {
     const [supSnap, linksSnap] = await Promise.all([ get(ref(db, 'appSettings/supportiveLinks')).catch(()=>null), get(ref(db, 'appSettings/support')).catch(()=>null) ]);
     const card = $('#channelsCard'); const host = $('#channelsHost');
     const v1 = supSnap?.exists() ? supSnap.val() : {}; const v2 = linksSnap?.exists() ? linksSnap.val() : {};
-    let tgUser = v1.telegram || v2.telegram || 'PunjabEsports'; let waNum  = v1.whatsapp || v2.whatsapp || '+919876543210'; let igUser = v1.instagram || v2.instagram || 'punjab_esports'; let email  = v1.gmail || v2.email || 'support@punjabesports.com';
+    let tgUser = v1.telegram || v2.telegram || 'PunjabEsports';
+    let waNum  = v1.whatsapp || v2.whatsapp || '+919876543210';
+    let igUser = v1.instagram || v2.instagram || 'punjab_esports';
+    let email  = v1.gmail || v2.email || 'anmolpreetsingh47902@gmail.com';
     let html = '';
-    if (waNum) { const cleanWa = waNum.replace(/[^0-9]/g, ''); const link = waNum.startsWith('http') ? waNum : `https://wa.me/${cleanWa}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn whatsapp"><div class="channel-btn-icon"><i class="fa-brands fa-whatsapp"></i></div><div class="cb-text"><b>WhatsApp</b><small>Get updates & chat directly on WhatsApp</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
-    if (tgUser) { const cleanTg = tgUser.replace(/^@/, '').replace(/^https?:\/\/t\.me\//,'').replace(/\/$/,''); const link = tgUser.startsWith('http') ? tgUser : `https://t.me/${cleanTg}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn telegram"><div class="channel-btn-icon"><i class="fa-brands fa-telegram"></i></div><div class="cb-text"><b>Telegram</b><small>Join our official channel for latest announcements</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
-    if (igUser) { const cleanIg = igUser.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//,'').replace(/\/$/,''); const link = igUser.startsWith('http') ? igUser : `https://instagram.com/${cleanIg}`; html += `<a href="${esc(link)}" target="_blank" rel="noopener" class="channel-btn instagram"><div class="channel-btn-icon"><i class="fa-brands fa-instagram"></i></div><div class="cb-text"><b>Instagram</b><small>Follow for match highlights & stories</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
-    if (email) { html += `<a href="mailto:${esc(email)}" class="channel-btn email"><div class="channel-btn-icon"><i class="fa-solid fa-envelope"></i></div><div class="cb-text"><b>Email Support</b><small>${esc(email)}</small></div><i class="fa-solid fa-arrow-right"></i></a>`; }
-    host.innerHTML = html; card.hidden = false;
+    if (waNum) {
+      const cleanWa = waNum.replace(/[^0-9]/g, '');
+      const link = waNum.startsWith('http') ? waNum : `https://wa.me/${cleanWa}`;
+      html += `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="channel-btn whatsapp" data-ext="${esc(link)}"><div class="channel-btn-icon"><i class="fa-brands fa-whatsapp"></i></div><div class="cb-text"><b>WhatsApp</b><small>Get updates & chat directly on WhatsApp</small></div><i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+    if (tgUser) {
+      const cleanTg = tgUser.replace(/^@/, '').replace(/^https?:\/\/t\.me\//,'').replace(/\/$/,'');
+      const link = tgUser.startsWith('http') ? tgUser : `https://t.me/${cleanTg}`;
+      html += `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="channel-btn telegram" data-ext="${esc(link)}"><div class="channel-btn-icon"><i class="fa-brands fa-telegram"></i></div><div class="cb-text"><b>Telegram</b><small>Join our official channel for latest announcements</small></div><i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+    if (igUser) {
+      const cleanIg = igUser.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//,'').replace(/\/$/,'');
+      const link = igUser.startsWith('http') ? igUser : `https://instagram.com/${cleanIg}`;
+      html += `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="channel-btn instagram" data-ext="${esc(link)}"><div class="channel-btn-icon"><i class="fa-brands fa-instagram"></i></div><div class="cb-text"><b>Instagram</b><small>Follow for match highlights & stories</small></div><i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+    if (email) {
+      const emailLink = `mailto:${encodeURIComponent(email)}?subject=Support%20Punjab%20Esports`;
+      html += `<a href="${esc(emailLink)}" target="_blank" rel="noopener noreferrer" class="channel-btn email" data-ext="${esc(emailLink)}"><div class="channel-btn-icon"><i class="fa-solid fa-envelope"></i></div><div class="cb-text"><b>Email Support</b><small>${esc(email)}</small></div><i class="fa-solid fa-arrow-right"></i></a>`;
+    }
+    host.innerHTML = html;
+    host.querySelectorAll('[data-ext]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        openExternalUrl(btn.dataset.ext);
+      };
+    });
+    card.hidden = false;
   } catch(e) { $('#channelsCard').hidden = false; }
 }
 
@@ -2574,16 +2644,19 @@ function openShareSheet(text, link) {
   const encText = encodeURIComponent(text);
   const encLink = encodeURIComponent(link);
   const shortLink = link.startsWith('http') ? link : 'https://' + link;
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encText}`;
+  const telegramUrl = `https://t.me/share/url?url=${encLink}&text=${encText}`;
+  const smsUrl = `sms:?body=${encText}`;
 
   openModal({
     title: 'Share Punjab Esports',
     bodyHTML: `
       <div class="alert info" style="margin-bottom:12px;padding:10px;"><i class="fa-solid fa-share-nodes"></i><span>Share with friends and earn rewards</span></div>
       <div class="share-grid">
-        <a class="share-btn whatsapp" href="https://wa.me/?text=${encText}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>
-        <a class="share-btn telegram" href="https://t.me/share/url?url=${encLink}&text=${encText}" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i><span>Telegram</span></a>
-        <a class="share-btn instagram" href="https://www.instagram.com/" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i><span>Instagram</span></a>
-        <a class="share-btn sms" href="sms:?body=${encText}"><i class="fa-solid fa-comment-sms"></i><span>SMS</span></a>
+        <a class="share-btn whatsapp" href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" id="shareWhatsAppBtn"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>
+        <a class="share-btn telegram" href="${telegramUrl}" target="_blank" rel="noopener noreferrer" id="shareTelegramBtn"><i class="fa-brands fa-telegram"></i><span>Telegram</span></a>
+        <button type="button" class="share-btn instagram" id="shareInstagramBtn" style="border:none;cursor:pointer;"><i class="fa-brands fa-instagram"></i><span>Instagram</span></button>
+        <a class="share-btn sms" href="${smsUrl}" target="_blank" rel="noopener noreferrer" id="shareSmsBtn"><i class="fa-solid fa-comment-sms"></i><span>SMS</span></a>
       </div>
       <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--txm);margin-bottom:6px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-eye"></i> Preview Message</div>
       <div class="share-preview">${esc(text)}</div>
@@ -2593,8 +2666,90 @@ function openShareSheet(text, link) {
     footerHTML: `<button class="btn btn-ghost w-100" data-x="close">Close</button>`,
     onMount: (el, close) => {
       el.querySelector('[data-x="close"]').onclick = close;
-      el.querySelector('#copyFullText').onclick = () => { navigator.clipboard?.writeText(text).then(() => toast('success','Message copied','')).catch(()=>toast('error','Copy failed','')); };
-      el.querySelector('#copyLinkOnly').onclick = () => { navigator.clipboard?.writeText(shortLink).then(() => toast('success','Link copied','')).catch(()=>toast('error','Copy failed','')); };
+
+      // WhatsApp Button
+      const waBtn = el.querySelector('#shareWhatsAppBtn');
+      if (waBtn) {
+        waBtn.onclick = (e) => {
+          e.preventDefault();
+          openExternalUrl(whatsappUrl);
+        };
+      }
+
+      // Telegram Button
+      const tgBtn = el.querySelector('#shareTelegramBtn');
+      if (tgBtn) {
+        tgBtn.onclick = (e) => {
+          e.preventDefault();
+          openExternalUrl(telegramUrl);
+        };
+      }
+
+      // SMS Button
+      const smsBtn = el.querySelector('#shareSmsBtn');
+      if (smsBtn) {
+        smsBtn.onclick = (e) => {
+          e.preventDefault();
+          openExternalUrl(smsUrl);
+        };
+      }
+
+      // Instagram Button / Native Share
+      const igBtn = el.querySelector('#shareInstagramBtn');
+      if (igBtn) {
+        igBtn.onclick = async (e) => {
+          e.preventDefault();
+          if (navigator.share) {
+            try {
+              await navigator.share({
+                title: 'Punjab Esports',
+                text: text,
+                url: shortLink
+              });
+              return;
+            } catch (err) {
+              if (err.name === 'AbortError') return;
+            }
+          }
+          if (window.AndroidInterface && typeof window.AndroidInterface.shareText === 'function') {
+            try {
+              window.AndroidInterface.shareText('Punjab Esports', text, shortLink);
+              return;
+            } catch (err) {}
+          }
+          await copyToClipboard(text);
+          toast('info', 'Message copied!', 'Open Instagram to share.');
+          setTimeout(() => {
+            openExternalUrl('https://instagram.com');
+          }, 800);
+        };
+      }
+
+      // Copy Full Message
+      const copyFullBtn = el.querySelector('#copyFullText');
+      if (copyFullBtn) {
+        copyFullBtn.onclick = async () => {
+          const success = await copyToClipboard(text);
+          if (success) {
+            toast('success', 'Copied successfully!', 'Full message copied to clipboard.');
+          } else {
+            toast('error', 'Copy failed', 'Please copy manually from preview.');
+          }
+        };
+      }
+
+      // Copy Link Only
+      const copyLinkBtn = el.querySelector('#copyLinkOnly');
+      if (copyLinkBtn) {
+        copyLinkBtn.onclick = async () => {
+          const success = await copyToClipboard(shortLink);
+          if (success) {
+            toast('success', 'Copied successfully!', 'Referral link copied to clipboard.');
+          } else {
+            toast('error', 'Copy failed', 'Please copy manually.');
+          }
+        };
+      }
     }
   });
 }
